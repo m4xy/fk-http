@@ -1,0 +1,44 @@
+import fckt.text.Encodings.*
+import uk.m4xy.fktests.api.Test
+import fckt.effects.Failure.attempt
+import fckt.effects.Fail
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.wire.Wire
+
+items = Url(Http, "shop.example", 8080, "/items", Some("page=2"))
+
+// A request is sent as HTTP/1.1 has it, and read back as it was sent.
+@Test @Fail aRequestIsSentAndReadBack() = {
+  request = Request(Post, items, [Header("Content-Type", "text/plain")], "two".encodeToBytes())
+  sent = Wire.requestBytes(request).decodeToString()
+  assertEquals("POST /items?page=2 HTTP/1.1\r\nContent-Type: text/plain\r\nHost: shop.example:8080\r\nContent-Length: 3\r\nConnection: close\r\n\r\ntwo", sent)
+  received = reading(sent) { Wire.readRequest() }
+  assertEquals(Some(request.copy(headers = [Header("Content-Type", "text/plain"), Header("Host", "shop.example:8080"), Header("Content-Length", "3"), Header("Connection", "close")])), received)
+  // A connection that ends before a request starts has none.
+  assertEquals(None, reading("") { Wire.readRequest() })
+}
+
+// A response is sent with its length, and read back however the server framed it.
+@Test @Fail aResponseIsSentAndReadBack() = {
+  sent = Wire.responseBytes(text(notFound, "gone")).decodeToString()
+  assertEquals("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 4\r\nConnection: close\r\n\r\ngone", sent)
+  received = reading(sent) { Wire.readResponse(Get) }
+  assertEquals(notFound, received.status)
+  assertEquals("gone", received.text)
+  // Chunked, as many servers send what they make as they go.
+  chunked = reading("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n6;note\r\npedia \r\n0\r\n\r\n") { Wire.readResponse(Get) }
+  assertEquals("Wikipedia ", chunked.text)
+  // Neither length nor chunks: all that comes until the connection ends.
+  assertEquals("to the end", reading("HTTP/1.0 200 OK\r\n\r\nto the end") { Wire.readResponse(Get) }.text)
+  // A HEAD's response has no body, whatever its length says.
+  assertEquals("", reading("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\n") { Wire.readResponse(Head) }.text)
+}
+
+// What isn't HTTP says what it should have been.
+@Test whatIsntHttpSaysSo() = {
+  assertEquals(Error("a request starts with its method, target and version, as GET /items HTTP/1.1, not hello"), attempt { reading("hello\r\n") { Wire.readRequest() } })
+  assertEquals(Error("a response starts with its version and status, as HTTP/1.1 200 OK, not SSH-2.0"), attempt { reading("SSH-2.0\r\n") { Wire.readResponse(Get) } })
+  assertEquals(Error("the connection ended after 2 of the body's 5 bytes"), attempt { reading("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nab") { Wire.readResponse(Get) } }.map { it.status })
+}

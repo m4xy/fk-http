@@ -1,0 +1,2 @@
+// How a URL is reached: http, as it's written, or https, through TLS.
+type Scheme { Http, Https }

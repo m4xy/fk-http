@@ -1,0 +1,43 @@
+import fckt.collections.Maps.*
+import fckt.effects.Fail
+import fckt.io.Channel
+import uk.m4xy.http.net.Network
+import fckt.text.Encodings.*
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.client.Client
+import uk.m4xy.http.server.*
+
+shop: List<Route> = [
+  Route(Get, "/items", call -> text(ok, "all the items")),
+  Route(Get, "/items/{id}", call -> text(ok, "item ${call.params.get("id").getOrElse("?")}")),
+  Route(Post, "/items", call -> text(created, "made ${call.request.text}")),
+  Route(Get, "/broken", call -> fail("the shelf fell")),
+]
+
+// A client's requests are answered by the routes for them, as a server of them would.
+@Test @Fail @Channel @Network requestsAreAnsweredByTheirRoute() = Server.answering(shop) {
+  assertEquals("all the items", Client.get("http://shop.example/items").text)
+  assertEquals("item 3", Client.get("http://shop.example/items/3").text)
+  made = Client.post("http://shop.example/items", "a lamp".encodeToBytes(), "text/plain")
+  assertEquals(created, made.status)
+  assertEquals("made a lamp", made.text)
+}
+
+// What no route is for, isn't found; what a route's for but not with that method, says what is;
+// and a route that fails says why.
+@Test @Fail @Channel @Network whatNoRouteAnswersSaysSo() = Server.answering(shop) {
+  missing = Client.get("http://shop.example/nothing")
+  assertEquals(notFound, missing.status)
+  assertEquals("nothing is at /nothing", missing.text)
+  // A parameter matches one segment, never none.
+  assertEquals(notFound, Client.get("http://shop.example/items/").status)
+  wrong = Client.send(Request(Delete, Url(Http, "shop.example", 80, "/items")))
+  assertEquals(methodNotAllowed, wrong.status)
+  assertEquals(Some("GET, POST"), wrong.header("Allow"))
+  broken = Client.get("http://shop.example/broken")
+  assertEquals(internalServerError, broken.status)
+  assertEquals("the shelf fell", broken.text)
+}

@@ -1,0 +1,133 @@
+import fckt.io.Reader
+import fckt.effects.Fail
+import fckt.text.Bytes
+import fckt.text.Encodings.*
+import uk.m4xy.http.*
+import uk.m4xy.http.Headers.*
+import uk.m4xy.http.Statuses.*
+
+// HTTP/1.1 as it's sent: requests and responses as bytes, and read back from what's received, a
+// line or some bytes at a time. Each message is the connection's only one, so says Connection: close,
+// and has its body's length as Content-Length.
+module Wire {
+  // The request as a client sends it.
+  requestBytes(request: Request): Bytes = {
+    url = request.url
+    host = if (url.port == UrlText.defaultPort(url.scheme)) url.host else "${url.host}:${url.port}"
+    headers = framed(request.headers.with("Host", host), request.body, request.method != Get && request.method != Head)
+    head("${MethodText.of(request.method)} ${UrlText.target(url)} HTTP/1.1", headers) + request.body
+  }
+
+  // The response as a server sends it.
+  responseBytes(response: Response): Bytes = {
+    status = response.status
+    head("HTTP/1.1 ${status.code} ${status.reason}", framed(response.headers, response.body, !status.isBodiless())) + response.body
+  }
+
+  // The request a client sent, from its start, as one asked of an http URL at its Host; or None, if
+  // it sent nothing before it ended.
+  @Reader @Fail readRequest(): Option<Request> = when (nextLine()) {
+    None -> None
+    Some(first) -> {
+      line = first.removeSuffix("\r")
+      (written, target) = when (line.split(" ")) {
+        [m, t, version] if version.startsWith("HTTP/") -> (m, t)
+        _ -> fail("a request starts with its method, target and version, as GET /items HTTP/1.1, not $line")
+      }
+      method = when (MethodText.read(written)) {
+        Ok(m) -> m
+        Error(reason) -> fail(reason)
+      }
+      if (!target.startsWith("/")) fail("a request's target is a path, as /items, not $target")
+      headers = readHeaders()
+      authority = headers.valueOf("Host").getOrElse("localhost")
+      url = when (UrlText.read("http://$authority$target")) {
+        Ok(u) -> u
+        Error(reason) -> fail(reason)
+      }
+      Some(Request(method, url, headers, readBody(headers, false)))
+    }
+  }
+
+  // The response a server sent to a request with method: a HEAD request's has no body, whatever its
+  // headers say.
+  @Reader @Fail readResponse(method: Method): Response = {
+    line = when (nextLine()) {
+      Some(l) -> l.removeSuffix("\r")
+      None -> fail("the server closed the connection without answering")
+    }
+    code = when (line.split(" ")) {
+      [version, c, *_] if version.startsWith("HTTP/") -> c.toIntOrNone()
+      _ -> None
+    }
+    status = when (code) {
+      Some(c) -> Status(c)
+      None -> fail("a response starts with its version and status, as HTTP/1.1 200 OK, not $line")
+    }
+    headers = readHeaders()
+    Response(status, headers, if (method == Head || status.isBodiless()) "".encodeToBytes() else readBody(headers, true))
+  }
+
+  // The start line and headers, each line ended \r\n, and a blank line after.
+  private head(start: String, headers: List<Header>): Bytes =
+    ([start] + headers.map { "${it.name}: ${it.value}" } + ["", ""]).joinToString("\r\n").encodeToBytes()
+
+  // The headers, saying how long body is, where it has one or might, and that the connection ends
+  // with the message.
+  private framed(headers: List<Header>, body: Bytes, mayHaveBody: Boolean): List<Header> = {
+    sized = if (body.size > 0 || mayHaveBody) headers.with("Content-Length", "${body.size}") else headers
+    sized.filter { it.name.lowercase() != "transfer-encoding" }.with("Connection", "close")
+  }
+
+  // The headers, up to the blank line after them.
+  @Reader @Fail private readHeaders(): List<Header> = when (nextLine()) {
+    None -> fail("the connection ended within the headers")
+    Some(l) -> {
+      line = l.removeSuffix("\r")
+      if (line.isEmpty()) []
+      else {
+        if (!line.contains(":")) fail("a header is a name, a colon and its value, as Content-Type: text/plain, not $line")
+        [Header(line.substringBefore(":").trim(), line.substringAfter(":").trim()), *readHeaders()]
+      }
+    }
+  }
+
+  // The body, as headers say: chunked, Content-Length long, or, where neither says and toEnd, all
+  // that's sent until the connection ends; a request's that says neither has none.
+  @Reader @Fail private readBody(headers: List<Header>, toEnd: Boolean): Bytes =
+    if (headers.valueOf("Transfer-Encoding").map { it.lowercase().contains("chunked") }.getOrElse(false)) readChunks()
+    else when (headers.valueOf("Content-Length")) {
+      Some(length) -> when (length.trim().toIntOrNone()) {
+        Some(n) -> exactly(n)
+        None -> fail("Content-Length is a number of bytes, not $length")
+      }
+      None -> if (toEnd) nextBytes(-1) else "".encodeToBytes()
+    }
+
+  // Chunks, each its size in hex on a line, then it, until one of size 0; then any trailing headers.
+  @Reader @Fail private readChunks(): Bytes = {
+    line = when (nextLine()) {
+      Some(l) -> l.removeSuffix("\r").substringBefore(";").trim()
+      None -> fail("the connection ended within a chunked body")
+    }
+    size = when (("0x" + line).toIntOrNone()) {
+      Some(n) -> n
+      None -> fail("a chunk starts with its size in hex, not $line")
+    }
+    if (size == 0) {
+      readHeaders()
+      "".encodeToBytes()
+    } else {
+      chunk = exactly(size)
+      nextLine()
+      chunk + readChunks()
+    }
+  }
+
+  // The next count bytes, failing if there are fewer.
+  @Reader @Fail private exactly(count: Int): Bytes = {
+    bytes = nextBytes(count)
+    if (bytes.size < count) fail("the connection ended after ${bytes.size} of the body's $count bytes")
+    bytes
+  }
+}

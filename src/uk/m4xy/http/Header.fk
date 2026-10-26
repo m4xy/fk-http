@@ -1,0 +1,3 @@
+// One of what a request or response says of itself, as Content-Type: text/plain. Names are the
+// same whatever their case.
+type Header(name: String, value: String)

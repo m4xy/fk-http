@@ -1,0 +1,34 @@
+// The statuses, by name, and what a status says of a response.
+module Statuses {
+  ok: Status = Status(200)
+  created: Status = Status(201)
+  noContent: Status = Status(204)
+  movedPermanently: Status = Status(301)
+  found: Status = Status(302)
+  notModified: Status = Status(304)
+  badRequest: Status = Status(400)
+  notFound: Status = Status(404)
+  methodNotAllowed: Status = Status(405)
+  internalServerError: Status = Status(500)
+
+  // What a response writes after the code: OK, Not Found.
+  Status.reason: String = when (this.code) {
+    200 -> "OK"
+    201 -> "Created"
+    204 -> "No Content"
+    301 -> "Moved Permanently"
+    302 -> "Found"
+    304 -> "Not Modified"
+    400 -> "Bad Request"
+    404 -> "Not Found"
+    405 -> "Method Not Allowed"
+    500 -> "Internal Server Error"
+    else -> if (this.isSuccess()) "OK" else if (this.code < 500) "Client Error" else "Server Error"
+  }
+
+  // That it worked: a code 200 to 299.
+  Status.isSuccess(): Boolean = this.code >= 200 && this.code < 300
+
+  // That the response has no body, whatever its headers say.
+  Status.isBodiless(): Boolean = (this.code >= 100 && this.code < 200) || this.code == 204 || this.code == 304
+}

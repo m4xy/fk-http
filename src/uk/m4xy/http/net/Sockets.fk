@@ -1,0 +1,32 @@
+import fckt.io.InputHandle
+import fckt.io.OutputHandle
+import fckt.text.Bytes
+
+// The machine's TCP sockets, which main handles @Network with. Sending to a connection the other
+// end has closed is an Error, not the end of the program.
+module Sockets : Network {
+  connect(host: String, port: Int): Result<Connection, String> = opened(tcpConnect(host, port))
+  listen(port: Int): Result<Listener, String> = tcpListen(port)
+  portOf(listener: Listener): Int = localPort(listener)
+  accept(listener: Listener): Result<Connection, String> = opened(tcpAccept(listener))
+  send(connection: Connection, bytes: Bytes): Result<Unit, String> = sendAll(connection.output, bytes)
+  close(connection: Connection): Unit = closeBoth(connection.input, connection.output)
+  stop(listener: Listener): Unit = closeListener(listener)
+
+  private opened(handles: Result<(InputHandle, OutputHandle), String>): Result<Connection, String> =
+    handles.map { input, output -> Connection(input, output) }
+
+  private external tcpConnect(host: String, port: Int): Result<(InputHandle, OutputHandle), String> =
+    "(fun h p -> Sys.set_signal Sys.sigpipe Sys.Signal_ignore; let rec first last = function [] -> Error (h ^ \":\" ^ string_of_int p ^ \": \" ^ last) | info :: rest -> (let s = Unix.socket info.Unix.ai_family Unix.SOCK_STREAM 0 in try Unix.connect s info.Unix.ai_addr; Ok (Unix.in_channel_of_descr s, Unix.out_channel_of_descr s) with Unix.Unix_error (e, _, _) -> Unix.close s; first (Unix.error_message e) rest) in match Unix.getaddrinfo h (string_of_int p) [Unix.AI_SOCKTYPE Unix.SOCK_STREAM] with [] -> Error (\"no address for \" ^ h) | infos -> first \"no address\" infos | exception Unix.Unix_error (e, _, _) -> Error (h ^ \": \" ^ Unix.error_message e)) host port"
+  private external tcpListen(port: Int): Result<Listener, String> =
+    "(fun p -> Sys.set_signal Sys.sigpipe Sys.Signal_ignore; let s = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in try Unix.setsockopt s Unix.SO_REUSEADDR true; Unix.bind s (Unix.ADDR_INET (Unix.inet_addr_any, p)); Unix.listen s 64; Ok s with Unix.Unix_error (e, _, _) -> Unix.close s; Error (\"port \" ^ string_of_int p ^ \": \" ^ Unix.error_message e)) port"
+  private external localPort(listener: Listener): Int =
+    "(fun l -> match Unix.getsockname l with Unix.ADDR_INET (_, p) -> p | _ -> 0) listener"
+  private external tcpAccept(listener: Listener): Result<(InputHandle, OutputHandle), String> =
+    "(fun l -> try let (s, _) = Unix.accept l in Ok (Unix.in_channel_of_descr s, Unix.out_channel_of_descr s) with Unix.Unix_error (e, _, _) -> Error (Unix.error_message e)) listener"
+  private external sendAll(output: OutputHandle, bytes: Bytes): Result<Unit, String> =
+    "(fun o b -> try output_string o b; flush o; Ok () with Sys_error e -> Error e) output bytes"
+  private external closeBoth(input: InputHandle, output: OutputHandle): Unit =
+    "(fun i o -> close_out_noerr o; close_in_noerr i) input output"
+  private external closeListener(listener: Listener): Unit = "(fun l -> try Unix.close l with Unix.Unix_error _ -> ()) listener"
+}

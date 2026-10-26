@@ -1,0 +1,27 @@
+import fckt.io.Channel
+import fckt.io.Channels.*
+import fckt.effects.Fail
+import fckt.effects.Failure.attempt
+import uk.m4xy.http.*
+import uk.m4xy.http.net.*
+import uk.m4xy.http.wire.Wire
+
+// Sends a request over a connection of its own, which is closed once the response is read.
+module HttpClient : Http {
+  @Network @Channel send(request: Request): Result<Response, String> = when (request.url.scheme) {
+    Https -> Error("fk-http can't send to an https URL yet, as it has no TLS: ${UrlText.of(request.url)}")
+    Http -> when (connect(request.url.host, request.url.port)) {
+      Error(reason) -> Error(reason)
+      Ok(connection) -> {
+        answered = attempt {
+          when (Network.send(connection, Wire.requestBytes(request))) {
+            Ok(_) -> readingFrom(connection.input) { Wire.readResponse(request.method) }
+            Error(reason) -> fail(reason)
+          }
+        }
+        close(connection)
+        answered
+      }
+    }
+  }
+}

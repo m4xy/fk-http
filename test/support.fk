@@ -1,0 +1,21 @@
+import fckt.io.Reader
+import fckt.text.Encodings.*
+
+// Runs body reading text, as if it were what a connection received.
+reading<A>(text: String, body: @Reader () -> A): A = {
+  var rest = text
+  Reader(
+    nextLine = () -> if (rest.isEmpty()) None else {
+      line = rest.substringBefore("\n")
+      rest = rest.drop(line.length + 1)
+      Some(line)
+    },
+    nextBytes = count -> {
+      taken = if (count < 0) rest else rest.take(count)
+      rest = rest.drop(taken.length)
+      taken.encodeToBytes()
+    },
+  ) { body() }
+}
+
+expectContains(text: String, part: String): Unit = if (!text.contains(part)) error("expected to find:\n$part\nin:\n$text")

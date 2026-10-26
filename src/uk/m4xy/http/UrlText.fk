@@ -1,0 +1,45 @@
+import fckt.text.Format
+
+// A URL as text: scheme://host[:port][path][?query], with no port when it's the scheme's own.
+module UrlText : Format {
+  type T = Url
+
+  of(value: Url): String = {
+    port = if (value.port == defaultPort(value.scheme)) "" else ":${value.port}"
+    "${value.scheme.name.lowercase()}://${value.host}$port${target(value)}"
+  }
+
+  read(text: String): Result<Url, String> = {
+    scheme = Scheme.values.find { text.startsWith(it.name.lowercase() + "://") }
+    when (scheme) {
+      None -> Error("a URL starts http:// or https://, as http://shop.example/items, not $text")
+      Some(s) -> {
+        rest = text.drop(s.name.length + 3)
+        authority = rest.take(firstOf(rest, ["/", "?"]))
+        after = rest.drop(authority.length)
+        path = after.substringBefore("?")
+        query = if (after.contains("?")) Some(after.substringAfter("?")) else None
+        host = if (authority.contains(":")) authority.substringBeforeLast(":") else authority
+        port = if (authority.contains(":")) authority.substringAfterLast(":").toIntOrNone() else Some(defaultPort(s))
+        when (port) {
+          _ if host.isEmpty() -> Error("a URL names a host, as http://shop.example/items, not $text")
+          Some(p) -> Ok(Url(s, host, p, if (path.isEmpty()) "/" else path, query))
+          None -> Error("a URL's port is a number, not ${authority.substringAfterLast(":")}")
+        }
+      }
+    }
+  }
+
+  // The port a scheme's URLs are at unless they say: 80 for http, 443 for https.
+  defaultPort(scheme: Scheme): Int = when (scheme) {
+    Http -> 80
+    Https -> 443
+  }
+
+  // What a request asks for at the URL's host: its path, and its query.
+  target(url: Url): String = url.path + url.query.map { "?$it" }.getOrElse("")
+
+  // Where the first of separators is in text, or its end.
+  private firstOf(text: String, separators: List<String>): Int =
+    separators.map { text.indexOf(it) }.filter { it >= 0 }.fold(text.length) { a, b -> if (b < a) b else a }
+}

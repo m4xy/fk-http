@@ -1,0 +1,7 @@
+import fckt.effects.Fail
+import uk.m4xy.http.*
+
+// What a server does for requests with method to path: respond, given the call. A path's segment
+// in braces, as {id} in /items/{id}, matches any one, and the call's params have it by name.
+// Where respond fails, the response says so, with status 500; what else it does is @E.
+type Route<@E>(method: Method, path: String, respond: @Fail @E (Call) -> Response)

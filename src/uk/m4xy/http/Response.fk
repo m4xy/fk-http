@@ -1,0 +1,5 @@
+import fckt.text.Bytes
+import fckt.text.Encodings.*
+
+// What a server answers a request with: how it went, the headers, and what it sends back.
+type Response(status: Status, headers: List<Header> = [], body: Bytes = "".encodeToBytes())

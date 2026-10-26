@@ -1,0 +1,8 @@
+// fk-http: HTTP/1.1 for fckt, a client and a server over one model of requests and responses.
+// kiln publishLocal publishes it, for projects to use as library("uk.m4xy:fk-http:0.1.0").
+import uk.m4xy.kiln.fckt.Fckt
+import uk.m4xy.fktests.kiln.*
+
+project = Project(name = "fk-http", group = "uk.m4xy", version = "0.1.0")
+
+plugins = [Fckt(), FkTests()]

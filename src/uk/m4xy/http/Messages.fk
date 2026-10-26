@@ -1,0 +1,22 @@
+import fckt.text.Bytes
+import fckt.text.Encodings.*
+import uk.m4xy.http.Headers.*
+
+// Making requests and responses, and reading what's in them.
+module Messages {
+  // A response of text, as plain text in UTF-8.
+  text(status: Status, text: String): Response =
+    Response(status, [Header("Content-Type", "text/plain; charset=utf-8")], text.encodeToBytes())
+
+  // What the response sent, as text: see Encodings' decodeToString.
+  Response.text: String = this.body.decodeToString()
+
+  // The value of the response's header named name, in any case.
+  Response.header(name: String): Option<String> = this.headers.valueOf(name)
+
+  // What the request sent, as text.
+  Request.text: String = this.body.decodeToString()
+
+  // The value of the request's header named name, in any case.
+  Request.header(name: String): Option<String> = this.headers.valueOf(name)
+}

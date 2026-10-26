@@ -1,0 +1,11 @@
+import fckt.text.Format
+
+// A method as a request writes it: GET, POST.
+module MethodText : Format {
+  type T = Method
+  of(value: Method): String = value.name.uppercase()
+  read(text: String): Result<Method, String> = when (Method.values.find { of(it) == text }) {
+    Some(method) -> Ok(method)
+    None -> Error("a method is one of ${Method.values.map { of(it) }.joinToString(", ")}, not $text")
+  }
+}

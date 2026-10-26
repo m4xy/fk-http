@@ -1,0 +1,10 @@
+// A request's or response's headers.
+module Headers {
+  // The value of the header named name, in any case.
+  List<Header>.valueOf(name: String): Option<String> =
+    this.find { it.name.lowercase() == name.lowercase() }.map { it.value }
+
+  // The headers, with name's, in any case, as value.
+  List<Header>.with(name: String, value: String): List<Header> =
+    this.filter { it.name.lowercase() != name.lowercase() } + [Header(name, value)]
+}
