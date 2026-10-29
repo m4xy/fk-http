@@ -19,7 +19,7 @@ module Server {
   // are answered; the routes take turns, as tasks do, so none sees another half way through. A
   // connection that receives or sends nothing for timeout is closed. The tasks are run as executor
   // runs them.
-  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = Polls.runningWith(executor) {
+  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = Polls.running(executor) {
     PolledSockets.running(timeout) {
       when (listen(port)) {
         Ok(listener) -> forever(listener, routes, timeout)
