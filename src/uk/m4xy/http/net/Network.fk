@@ -1,16 +1,18 @@
 import fckt.text.Bytes
 
 // Connections over the network: what a client opens, and a server accepts. Main handles it with
-// Sockets; what's received is read through @Channel, from a connection's input.
+// Sockets; Connections reads what a connection receives a line or some bytes at a time.
 @HandledBy(Sockets) effect Network {
-  // A connection to port at host.
-  connect(host: String, port: Int): Result<Connection, String>
+  // A connection to port at host, kept as security says.
+  connect(host: String, port: Int, security: Security): Result<Connection, String>
   // Listens on port, on every address the machine has; at port 0, any that's free.
   listen(port: Int): Result<Listener, String>
   // The port listener is on.
   portOf(listener: Listener): Int
-  // The next connection made to listener, waiting for one.
+  // The next connection made to listener, plain, waiting for one.
   accept(listener: Listener): Result<Connection, String>
+  // What the connection's received next, waiting for some; none once the other end's closed it.
+  receive(connection: Connection): Result<Bytes, String>
   // Sends bytes, all of them, before it gives back.
   send(connection: Connection, bytes: Bytes): Result<Unit, String>
   // Closes the connection, both ways.

@@ -1,5 +1,3 @@
-import fckt.io.Channel
-import fckt.io.Channels.*
 import fckt.effects.Fail
 import fckt.effects.Failure.attempt
 import uk.m4xy.http.*
@@ -11,17 +9,17 @@ import uk.m4xy.http.client.Http
 // Serving routes: over the network, a connection at a time, or to requests a program sends itself.
 module Server {
   // Serves routes on port until the program ends.
-  @Network @Channel @Fail serve<@E>(port: Int, routes: List<Route<@E>>): Nothing = when (listen(port)) {
+  @Network @Fail serve<@E>(port: Int, routes: List<Route<@E>>): Nothing = when (listen(port)) {
     Ok(listener) -> forever(listener, routes)
     Error(reason) -> fail(reason)
   }
 
   // Accepts the next connection to listener, answers its request, and closes it: a request that
   // isn't HTTP is answered 400.
-  @Network @Channel handleNext<@E>(listener: Listener, routes: List<Route<@E>>): Unit = when (accept(listener)) {
+  @Network handleNext<@E>(listener: Listener, routes: List<Route<@E>>): Unit = when (accept(listener)) {
     Error(_) -> Unit
     Ok(connection) -> {
-      response = when (attempt { readingFrom(connection.input) { Wire.readRequest() } }) {
+      response = when (attempt { Connections.reading(connection) { Wire.readRequest() } }) {
         Ok(Some(request)) -> Some(Routes.respond(routes, request))
         Ok(None) -> None
         Error(reason) -> Some(Messages.text(badRequest, reason))
@@ -33,12 +31,12 @@ module Server {
   }
 
   // Runs body with the requests it sends answered by routes, as a server of them would, without
-  // the network: to test a client and server together. It's @Network and @Channel only as
-  // anything that does @Http is.
-  @Network @Channel answering<@E, A>(routes: List<Route<@E>>, body: @Http () -> A): A =
+  // the network: to test a client and server together. It's @Network only as anything that does
+  // @Http is.
+  @Network answering<@E, A>(routes: List<Route<@E>>, body: @Http () -> A): A =
     Http(send = request -> Ok(Routes.respond(routes, request))) { body() }
 
-  @Network @Channel private forever<@E>(listener: Listener, routes: List<Route<@E>>): Nothing = {
+  @Network private forever<@E>(listener: Listener, routes: List<Route<@E>>): Nothing = {
     handleNext(listener, routes)
     forever(listener, routes)
   }

@@ -1,5 +1,4 @@
 import fckt.collections.Maps.*
-import fckt.io.Channel
 import fckt.effects.Fail
 import fckt.effects.Failure.attempt
 import uk.m4xy.fktests.api.Test
@@ -11,7 +10,7 @@ import uk.m4xy.http.net.*
 import uk.m4xy.http.server.*
 
 // Over real sockets: a server, in a copy of this program, answers a client in this one.
-@Test @Fail @Channel @Network @Http aClientAndServerTalkOverTheNetwork() = {
+@Test @Fail @Network @Http aClientAndServerTalkOverTheNetwork() = {
   listener = when (listen(0)) {
     Ok(l) -> l
     Error(reason) -> fail(reason)

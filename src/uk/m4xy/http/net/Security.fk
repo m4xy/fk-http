@@ -1,0 +1,3 @@
+// How a connection is kept from others: Plain, as it's sent; or through Tls, encrypted, with the
+// other end's certificate checked against those the machine trusts, and for the host it's for.
+type Security { Plain, Tls }

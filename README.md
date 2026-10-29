@@ -20,7 +20,16 @@ main() = Server.serve(8080, shop)                                  // a server
 main() = println(Client.get("http://localhost:8080/items/3").text)   // a client
 ```
 
-A [kiln](https://github.com/m4xy/kiln) project uses it as `library("uk.m4xy:fk-http:0.1.0")`.
+A [kiln](https://github.com/m4xy/kiln) project uses it as `library("uk.m4xy:fk-http:0.1.0")`. Its
+TLS is OpenSSL's, through the OCaml package `ssl`, so a machine that builds with it needs
+[opam](https://opam.ocaml.org) and that package:
+
+```
+brew install opam pkgconf && opam init --bare --no-setup && opam switch create default ocaml-system
+PKG_CONFIG_PATH=$(brew --prefix openssl@3)/lib/pkgconfig opam install ssl ocamlfind
+```
+
+kiln links it into any program that uses fk-http, without the program saying so.
 
 ## The model
 
@@ -46,7 +55,9 @@ Bodies are `Bytes`, so anything can be sent; `.text` reads one as UTF-8.
 404, is still a response, so look at its status.
 
 `main` handles `Http` with `HttpClient`, which opens a connection for each request and closes it
-once the response is read. A test can answer `Http` itself, so nothing is sent:
+once the response is read. An https URL's connection goes through TLS. The host's certificate must
+be signed by one the machine's OpenSSL trusts, and be for that host. Otherwise there's no response,
+only the reason: `expired.badssl.com's certificate isn't trusted: certificate has expired`. A test can answer `Http` itself, so nothing is sent:
 
 ```kotlin
 Http(send = request -> Ok(text(ok, "stubbed"))) { Client.get("http://shop.example/items") }
@@ -72,7 +83,7 @@ connection.
 network. It tests a client and its server together:
 
 ```kotlin
-@Test @Fail @Channel @Network itemsAreFound() = Server.answering(shop) {
+@Test @Fail @Network itemsAreFound() = Server.answering(shop) {
   assertEquals("item 3", Client.get("http://shop.example/items/3").text)
 }
 ```
@@ -82,7 +93,7 @@ network. It tests a client and its server together:
 ```
 uk.m4xy.http           The model: Request, Response, Method, Status, Url, Header
 uk.m4xy.http.wire      Wire: requests and responses as bytes, and read back through @Reader
-uk.m4xy.http.net       Network: connections, which main handles with Sockets
+uk.m4xy.http.net       Network: connections, plain or TLS, which main handles with Sockets; Connections reads them
 uk.m4xy.http.client    Http: sending requests, which main handles with HttpClient; Client
 uk.m4xy.http.server    Route, Call, Routes and Server
 ```
@@ -92,20 +103,21 @@ can parse a message from a string. Each message is the only one on its connectio
 `Connection: close`, and gives its length with `Content-Length`. What's received may also be
 chunked, or run until the connection ends.
 
-`Network` opens connections and sends on them. What's received is read through fckt's `Channel`,
-from a connection's input, as a file is. `Http` declares `@Network @Channel`, as its default handler
-uses them. So anything that does `@Http` does them too, even under `Server.answering`, which uses no
+`Network` opens connections, receives and sends on them, and closes them, the same whether they're
+plain or TLS. `Sockets` handles it with the machine's sockets, and OpenSSL's TLS over them.
+`Connections.reading` reads what a connection receives a line or some bytes at a time, keeping what
+it hasn't read yet for the next read. `Http` declares `@Network`, as its default handler uses it. So
+anything that does `@Http` does `@Network` too, even under `Server.answering`, which uses no
 network.
 
 Not yet supported:
 
-- **https.** There's no TLS: `HttpClient` refuses https URLs, saying so. Once kiln can build a
-  library with C code, a TLS handler of `Network` backed by OpenSSL will make https work without
-  changing anything above `Network`.
+- **A server over https.** `Server` serves plain HTTP only, as it has no certificate to serve with.
 - **Concurrency.** A connection carries one request, and a server answers one connection at a time.
 
 ## Building
 
 `kiln build` builds and tests it; `kiln publishLocal` publishes it to `~/.kiln/repository`. Its
 tests run a client against a server over real sockets: the server runs in a forked copy of the
-test program.
+test program. Those in `tls.fk` need the internet: they fetch `https://example.com`, and check that
+badssl.com's expired, wrong-host and self-signed certificates are refused.

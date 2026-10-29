@@ -1,0 +1,61 @@
+import fckt.io.Reader
+import fckt.effects.Fail
+import fckt.text.Bytes
+import fckt.text.Encodings.*
+import fckt.values.Mutable
+
+// Reading what a connection receives a line or some bytes at a time, as it comes.
+module Connections {
+  // Runs body reading what connection receives: what's received and not yet read is kept for the
+  // next read.
+  @Network @Fail reading<A>(connection: Connection, body: @Reader () -> A): A = {
+    kept = Mutable(Kept("".encodeToBytes(), false))
+    Reader(nextLine = () -> line(connection, kept), nextBytes = count -> bytes(connection, kept, count)) { body() }
+  }
+
+  // The next line, without its end, or None if there's nothing left.
+  @Network @Fail @Mutating private line(connection: Connection, kept: Mutable<Kept>): Option<String> = {
+    k = kept.value
+    at = indexOfNewline(k.bytes)
+    if (at >= 0) {
+      kept.value = k.copy(bytes = slice(k.bytes, at + 1, k.bytes.size - at - 1))
+      Some(slice(k.bytes, 0, at).decodeToString())
+    } else if (k.ended) {
+      kept.value = k.copy(bytes = "".encodeToBytes())
+      if (k.bytes.size == 0) None else Some(k.bytes.decodeToString())
+    } else {
+      more(connection, kept)
+      line(connection, kept)
+    }
+  }
+
+  // The next count bytes, or fewer if the connection ends first; all that's left if count is
+  // below 0.
+  @Network @Fail @Mutating private bytes(connection: Connection, kept: Mutable<Kept>, count: Int): Bytes = {
+    k = kept.value
+    if (count >= 0 && k.bytes.size >= count) {
+      kept.value = k.copy(bytes = slice(k.bytes, count, k.bytes.size - count))
+      slice(k.bytes, 0, count)
+    } else if (k.ended) {
+      kept.value = k.copy(bytes = "".encodeToBytes())
+      k.bytes
+    } else {
+      more(connection, kept)
+      bytes(connection, kept, count)
+    }
+  }
+
+  // What the connection receives next, kept: or that it's ended.
+  @Network @Fail @Mutating private more(connection: Connection, kept: Mutable<Kept>): Unit = when (receive(connection)) {
+    Ok(received) -> {
+      kept.value = if (received.size == 0) kept.value.copy(ended = true) else kept.value.copy(bytes = kept.value.bytes + received)
+    }
+    Error(reason) -> fail(reason)
+  }
+
+  private external indexOfNewline(bytes: Bytes): Int = "(fun b -> match String.index_opt b '\\n' with Some i -> i | None -> -1) bytes"
+  private external slice(bytes: Bytes, from: Int, count: Int): Bytes = "String.sub bytes from count"
+}
+
+// What's been received and not yet read, and whether the connection's ended.
+private type Kept(bytes: Bytes, ended: Boolean)

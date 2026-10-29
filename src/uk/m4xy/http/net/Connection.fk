@@ -1,6 +1,3 @@
-import fckt.io.InputHandle
-import fckt.io.OutputHandle
-
-// An open connection to another program, over the network: what it sends is read from input,
-// through @Channel, as a file is; what's sent to it goes through Network's send.
-type Connection(input: InputHandle, output: OutputHandle)
+// An open connection to another program, over the network, plain or through TLS: Network
+// receives what it sends, sends to it, and closes it, the same whichever it is.
+external type Connection = "(unit -> (string, string) result) * (string -> (unit, string) result) * (unit -> unit)"

@@ -1,32 +1,44 @@
-import fckt.io.InputHandle
-import fckt.io.OutputHandle
 import fckt.text.Bytes
 
-// The machine's TCP sockets, which main handles @Network with. Sending to a connection the other
-// end has closed is an Error, not the end of the program.
+// The machine's TCP sockets, which main handles @Network with, and OpenSSL's TLS over them. Sending
+// to a connection the other end has closed is an Error, not the end of the program.
 module Sockets : Network {
-  connect(host: String, port: Int): Result<Connection, String> = opened(tcpConnect(host, port))
+  connect(host: String, port: Int, security: Security): Result<Connection, String> = when (tcpConnect(host, port)) {
+    Ok(socket) -> when (security) {
+      Plain -> Ok(plainOver(socket))
+      Tls -> tlsOver(socket, host)
+    }
+    Error(reason) -> Error(reason)
+  }
   listen(port: Int): Result<Listener, String> = tcpListen(port)
   portOf(listener: Listener): Int = localPort(listener)
-  accept(listener: Listener): Result<Connection, String> = opened(tcpAccept(listener))
-  send(connection: Connection, bytes: Bytes): Result<Unit, String> = sendAll(connection.output, bytes)
-  close(connection: Connection): Unit = closeBoth(connection.input, connection.output)
+  accept(listener: Listener): Result<Connection, String> = tcpAccept(listener).map { plainOver(it) }
+  receive(connection: Connection): Result<Bytes, String> = received(connection)
+  send(connection: Connection, bytes: Bytes): Result<Unit, String> = sent(connection, bytes)
+  close(connection: Connection): Unit = closed(connection)
   stop(listener: Listener): Unit = closeListener(listener)
 
-  private opened(handles: Result<(InputHandle, OutputHandle), String>): Result<Connection, String> =
-    handles.map { input, output -> Connection(input, output) }
+  // A socket connected to the first of host's addresses that takes one.
+  private external tcpConnect(host: String, port: Int): Result<Socket, String> =
+    "(fun h p -> Sys.set_signal Sys.sigpipe Sys.Signal_ignore; let rec first last = function [] -> Error (h ^ \":\" ^ string_of_int p ^ \": \" ^ last) | info :: rest -> (let s = Unix.socket info.Unix.ai_family Unix.SOCK_STREAM 0 in try Unix.connect s info.Unix.ai_addr; Ok s with Unix.Unix_error (e, _, _) -> Unix.close s; first (Unix.error_message e) rest) in match Unix.getaddrinfo h (string_of_int p) [Unix.AI_SOCKTYPE Unix.SOCK_STREAM] with [] -> Error (\"no address for \" ^ h) | infos -> first \"no address\" infos | exception Unix.Unix_error (e, _, _) -> Error (h ^ \": \" ^ Unix.error_message e)) host port"
 
-  private external tcpConnect(host: String, port: Int): Result<(InputHandle, OutputHandle), String> =
-    "(fun h p -> Sys.set_signal Sys.sigpipe Sys.Signal_ignore; let rec first last = function [] -> Error (h ^ \":\" ^ string_of_int p ^ \": \" ^ last) | info :: rest -> (let s = Unix.socket info.Unix.ai_family Unix.SOCK_STREAM 0 in try Unix.connect s info.Unix.ai_addr; Ok (Unix.in_channel_of_descr s, Unix.out_channel_of_descr s) with Unix.Unix_error (e, _, _) -> Unix.close s; first (Unix.error_message e) rest) in match Unix.getaddrinfo h (string_of_int p) [Unix.AI_SOCKTYPE Unix.SOCK_STREAM] with [] -> Error (\"no address for \" ^ h) | infos -> first \"no address\" infos | exception Unix.Unix_error (e, _, _) -> Error (h ^ \": \" ^ Unix.error_message e)) host port"
+  // The socket, as it is: what it receives and sends is what goes over the network.
+  private external plainOver(socket: Socket): Connection =
+    "(fun s -> let buf = Bytes.create 65536 in let rec receive () = match Unix.read s buf 0 65536 with n -> Ok (Bytes.sub_string buf 0 n) | exception Unix.Unix_error (Unix.EINTR, _, _) -> receive () | exception Unix.Unix_error (e, _, _) -> Error (Unix.error_message e) in let send b = (try let rec go o = if o < String.length b then go (o + Unix.write_substring s b o (String.length b - o)) in go 0; Ok () with Unix.Unix_error (e, _, _) -> Error (Unix.error_message e)) in (receive, send, (fun () -> try Unix.close s with Unix.Unix_error _ -> ()))) socket"
+
+  // TLS over the socket, to host: its certificate must be signed by one the machine's OpenSSL
+  // trusts, and be for host; otherwise there's no connection, and why.
+  private external tlsOver(socket: Socket, host: String): Result<Connection, String> =
+    "(fun s h -> let failed what = (match (Ssl.Error.get_error ()).Ssl.Error.reason with Some r -> h ^ \": TLS failed \" ^ what ^ \": \" ^ r | None -> h ^ \": TLS failed \" ^ what) in try Ssl.init (); let ctx = Ssl.create_context Ssl.TLSv1_2 Ssl.Client_context in ignore (Ssl.set_default_verify_paths ctx); Ssl.set_verify ctx [Ssl.Verify_peer] None; let t = Ssl.embed_socket s ctx in Ssl.set_client_SNI_hostname t h; Ssl.set_host t h; match Ssl.connect t with exception Ssl.Connection_error _ -> (let v = Ssl.get_verify_result t in let why = if v <> 0 then h ^ \"'s certificate isn't trusted: \" ^ Ssl.get_verify_error_string v else failed \"to connect\" in (try Unix.close s with Unix.Unix_error _ -> ()); Error why) | () -> (let buf = Bytes.create 65536 in let receive () = (match Ssl.read t buf 0 65536 with n -> Ok (Bytes.sub_string buf 0 n) | exception Ssl.Read_error (Ssl.Error_zero_return | Ssl.Error_syscall) -> Ok \"\" | exception Ssl.Read_error _ -> Error (failed \"receiving\")) in let send b = (try Ssl.output_string t b; Ok () with Ssl.Write_error _ -> Error (failed \"sending\")) in let close () = (try Ssl.shutdown t with _ -> ()); (try Unix.close s with Unix.Unix_error _ -> ()) in Ok (receive, send, close)) with Ssl.Method_error | Ssl.Context_error -> (try Unix.close s with Unix.Unix_error _ -> ()); Error (failed \"to start\")) socket host"
+
   private external tcpListen(port: Int): Result<Listener, String> =
     "(fun p -> Sys.set_signal Sys.sigpipe Sys.Signal_ignore; let s = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in try Unix.setsockopt s Unix.SO_REUSEADDR true; Unix.bind s (Unix.ADDR_INET (Unix.inet_addr_any, p)); Unix.listen s 64; Ok s with Unix.Unix_error (e, _, _) -> Unix.close s; Error (\"port \" ^ string_of_int p ^ \": \" ^ Unix.error_message e)) port"
   private external localPort(listener: Listener): Int =
     "(fun l -> match Unix.getsockname l with Unix.ADDR_INET (_, p) -> p | _ -> 0) listener"
-  private external tcpAccept(listener: Listener): Result<(InputHandle, OutputHandle), String> =
-    "(fun l -> try let (s, _) = Unix.accept l in Ok (Unix.in_channel_of_descr s, Unix.out_channel_of_descr s) with Unix.Unix_error (e, _, _) -> Error (Unix.error_message e)) listener"
-  private external sendAll(output: OutputHandle, bytes: Bytes): Result<Unit, String> =
-    "(fun o b -> try output_string o b; flush o; Ok () with Sys_error e -> Error e) output bytes"
-  private external closeBoth(input: InputHandle, output: OutputHandle): Unit =
-    "(fun i o -> close_out_noerr o; close_in_noerr i) input output"
+  private external tcpAccept(listener: Listener): Result<Socket, String> =
+    "(fun l -> let rec go () = match Unix.accept l with (s, _) -> Ok s | exception Unix.Unix_error (Unix.EINTR, _, _) -> go () | exception Unix.Unix_error (e, _, _) -> Error (Unix.error_message e) in go ()) listener"
+  private external received(connection: Connection): Result<Bytes, String> = "(fun (receive, _, _) -> receive ()) connection"
+  private external sent(connection: Connection, bytes: Bytes): Result<Unit, String> = "(fun (_, send, _) b -> send b) connection bytes"
+  private external closed(connection: Connection): Unit = "(fun (_, _, close) -> close ()) connection"
   private external closeListener(listener: Listener): Unit = "(fun l -> try Unix.close l with Unix.Unix_error _ -> ()) listener"
 }
