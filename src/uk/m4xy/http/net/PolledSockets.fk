@@ -1,0 +1,30 @@
+import fckt.concurrent.Concurrent
+import fckt.io.Polling
+import fckt.io.Polls.*
+import fckt.time.Clock
+import fckt.time.Duration
+
+// The machine's sockets, as Sockets has them, but waiting as Polls does: where a task would wait to
+// accept, receive or send, it parks, and the others go on. A handler's code runs where it's
+// installed, so a task that's to wait so has it around its own code. Connecting and TLS's handshake
+// still wait, as the system does them. What waits longer than timeout to receive or send is an
+// Error, so a connection the other end has left open, and gone quiet on, ends.
+module PolledSockets {
+  @Concurrent<@Polling @Clock @E> @Polling @Clock running<A, @E>(timeout: Duration, block: @Network @E () -> A): A = Network(
+    connect = (host, port, security) -> Sockets.connect(host, port, security),
+    listen = port -> Sockets.listen(port),
+    portOf = listener -> Sockets.portOf(listener),
+    accept = listener -> {
+      awaitReadable(Sockets.listenerDescriptor(listener))
+      Sockets.accept(listener)
+    },
+    receive = connection ->
+      if (Sockets.buffered(connection) || awaitReadableFor(Sockets.descriptorOf(connection), timeout)) Sockets.receive(connection)
+      else Error("nothing was received for ${timeout.millis / 1000.0}s"),
+    send = (connection, bytes) ->
+      if (awaitWritableFor(Sockets.descriptorOf(connection), timeout)) Sockets.send(connection, bytes)
+      else Error("nothing could be sent for ${timeout.millis / 1000.0}s"),
+    close = connection -> Sockets.close(connection),
+    stop = listener -> Sockets.stop(listener),
+  ) { block() }
+}

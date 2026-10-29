@@ -1,2 +1,0 @@
-// A TCP socket, open, which Sockets makes a connection of, plain or through TLS.
-external type Socket = "Unix.file_descr"

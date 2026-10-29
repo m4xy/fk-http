@@ -75,9 +75,13 @@ the first matching route's response. When nothing matches, it gives:
 
 A route can do any effect: a `List<Route<@Db>>` serves routes that use `@Db`.
 
-`Server.serve(port, routes)` serves them until the program ends, one connection at a time, and
-answers anything that isn't HTTP with 400. `Server.handleNext(listener, routes)` answers a single
-connection.
+`Server.serve(port, routes)` serves them until the program ends, and answers anything that isn't
+HTTP with 400. Each connection is a task of its own, as `fckt.concurrent` has them: while one waits
+for a slow client, the others are answered. A connection that receives or sends nothing for
+`timeout`, 30 seconds unless it says otherwise, `serve(port, routes, timeout = Duration(5000))`, is
+answered 400, saying so, and closed. Tasks take turns, one running at a time, so routes never see
+each other half way through anything. `Server.handleNext(listener, routes)` answers a single
+connection, waiting for it as `Network` does.
 
 `Server.answering(routes) { ... }` answers the requests its block sends with the routes, without a
 network. It tests a client and its server together:
@@ -128,7 +132,7 @@ can parse a message from a string. Each message is the only one on its connectio
 chunked, or run until the connection ends.
 
 `Network` opens connections, receives and sends on them, and closes them, the same whether they're
-plain or TLS. `Sockets` handles it with the machine's sockets, and OpenSSL's TLS over them.
+plain or TLS. `Sockets` handles it with the machine's sockets, and OpenSSL's TLS over them. `PolledSockets` handles it the same way, but where a task would wait to accept, receive or send, it parks until `fckt.io.Polls`' `select` says it can go on. A handler's code runs where it's installed, so it goes around each task's own code, not around the server.
 `Connections.reading` reads what a connection receives a line or some bytes at a time, keeping what
 it hasn't read yet for the next read. `Http` declares `@Network`, as its default handler uses it. So
 anything that does `@Http` does `@Network` too, even under `Server.answering`, which uses no
@@ -137,7 +141,13 @@ network.
 Not yet supported:
 
 - **A server over https.** `Server` serves plain HTTP only, as it has no certificate to serve with.
-- **Concurrency.** A connection carries one request, and a server answers one connection at a time.
+- **Keep-alive.** A connection carries one request.
+- **Parallelism.** A server's tasks take turns on one core, which suits what mostly waits for the
+  network; work that keeps a core busy keeps the others waiting while it does.
+- **Waiting in a route's own requests.** A route's `Client` calls, and connecting and TLS, wait as
+  the system does, holding up the other tasks meanwhile. OpenSSL can hold what it's received where
+  `select` can't see it, and the `ssl` package can't say whether it does, so TLS is never waited
+  for as a task.
 
 ## Building
 

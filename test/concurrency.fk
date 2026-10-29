@@ -1,0 +1,73 @@
+import fckt.collections.Maps.*
+import fckt.effects.Fail
+import fckt.effects.Failure.attempt
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.client.*
+import uk.m4xy.http.net.*
+import uk.m4xy.http.server.*
+import fckt.time.Duration
+import fckt.text.Encodings.*
+
+// A client that connects and says nothing keeps no other waiting: the server, in a copy of this
+// program, answers the others meanwhile.
+@Test @Fail @Network @Http aSlowClientKeepsNoOtherWaiting() = {
+  port = freePort()
+  server = forkedServer(Unit)
+  if (server == 0) {
+    attempt { Server.serve(port, [Route(Get, "/hello", call -> text(ok, "hello"))]) }
+    exitAt(1)
+  }
+  silent = connected(port, 50)
+  answered = attempt {
+    [1, 2, 3].map { Client.get("http://localhost:$port/hello").text }
+  }
+  // The server, still answering, for ever, is made to stop.
+  silent.forEach { close(it) }
+  stopped(server)
+  assertEquals(Ok(["hello", "hello", "hello"]), answered)
+}
+
+// A connection that sends nothing for the server's timeout is answered 400, saying so, and closed.
+@Test @Fail @Network aQuietConnectionIsClosed() = {
+  port = freePort()
+  server = forkedServer(Unit)
+  if (server == 0) {
+    attempt { Server.serve(port, [Route(Get, "/hello", call -> text(ok, "hello"))], timeout = Duration(200)) }
+    exitAt(1)
+  }
+  quiet = connected(port, 50)
+  answered = quiet.map { c -> receive(c).map { it.decodeToString() } }
+  closed = quiet.map { c -> receive(c).map { it.decodeToString() } }
+  quiet.forEach { close(it) }
+  stopped(server)
+  assertEquals(Some(true), answered.map { r -> r.map { it.startsWith("HTTP/1.1 400 Bad Request") && it.endsWith("nothing was received for 0.2s") }.getOrElse(false) })
+  assertEquals(Some(Ok("")), closed)
+}
+
+// A port nothing's listening on now.
+@Network @Fail freePort(): Int = when (listen(0)) {
+  Ok(listener) -> {
+    port = portOf(listener)
+    stop(listener)
+    port
+  }
+  Error(reason) -> fail(reason)
+}
+
+// A connection to port, once the server's listening on it, trying every 20 milliseconds, tries
+// times; it sends nothing.
+@Network connected(port: Int, tries: Int): Option<Connection> = when (connect("localhost", port, Plain)) {
+  Ok(connection) -> Some(connection)
+  Error(_) -> if (tries > 0) {
+    pauseFor(Unit)
+    connected(port, tries - 1)
+  } else None
+}
+
+private external pauseFor(u: Unit): Unit = "(fun _ -> Unix.sleepf 0.02) u"
+private external forkedServer(u: Unit): Int = "(fun _ -> Unix.fork ()) u"
+private external stopped(pid: Int): Unit = "(fun p -> (try Unix.kill p Sys.sigterm with Unix.Unix_error _ -> ()); ignore (Unix.waitpid [] p)) pid"
+private external exitAt(code: Int): Nothing = "Unix._exit code"
