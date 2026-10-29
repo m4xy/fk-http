@@ -17,7 +17,8 @@ module Client {
   @Http @Fail post(url: String, body: Bytes, contentType: String): Response =
     send(Request(Post, parsed(url), [Header("Content-Type", contentType)], body))
 
-  @Fail private parsed(url: String): Url = when (UrlText.read(url)) {
+  // The URL url says; it not being one fails.
+  @Fail parsed(url: String): Url = when (UrlText.read(url)) {
     Ok(u) -> u
     Error(reason) -> fail(reason)
   }

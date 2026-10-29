@@ -3,7 +3,8 @@
 import uk.m4xy.kiln.fckt.*
 import uk.m4xy.fktests.kiln.*
 
-project = Project(name = "fk-http", group = "uk.m4xy", version = "0.1.0")
+// Its JSON bodies are written and read by fk-serialization's serializers.
+project = Project(name = "fk-http", group = "uk.m4xy", version = "0.1.0", dependencies = [library("uk.m4xy:fk-serialization:0.1.0")])
 
 // Its TLS is OpenSSL's, through the OCaml package ssl: opam install ssl.
 module WithSsl : FcktConfiguration {

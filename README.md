@@ -88,6 +88,29 @@ network. It tests a client and its server together:
 }
 ```
 
+## JSON
+
+A body can be a value, as JSON, written and read by its
+[fk-serialization](https://github.com/m4xy/fk-serialization) serializer, which its processor writes
+for each type marked `@Serializable`. `JsonBodies` has both sides:
+
+```kotlin
+import uk.m4xy.http.json.JsonBodies.*
+
+shop: List<Route> = [
+  Route(Get, "/items/{id}", call -> json(ok, ItemSerializer, found(call.params))),
+  Route(Post, "/items", call -> receiving(call, ItemSerializer) { item -> json(created, ItemSerializer, saved(item)) }),
+]
+
+item = Client.get("https://shop.example/items/3").json(ItemSerializer)
+made = postJson("https://shop.example/items", ItemSerializer, Item("desk", 99))
+```
+
+`json` answers with a value, as `application/json`, and `Response.json` reads one, failing, saying
+why, where it isn't one. `receiving` gives a route the value a request sent, and where it sent none,
+answers 400, saying why, as it's the client that's wrong, not the route. `postJson` and `putJson`
+send one.
+
 ## How it works
 
 ```
@@ -96,6 +119,7 @@ uk.m4xy.http.wire      Wire: requests and responses as bytes, and read back thro
 uk.m4xy.http.net       Network: connections, plain or TLS, which main handles with Sockets; Connections reads them
 uk.m4xy.http.client    Http: sending requests, which main handles with HttpClient; Client
 uk.m4xy.http.server    Route, Call, Routes and Server
+uk.m4xy.http.json      JsonBodies: requests and responses of values, as JSON, through fk-serialization
 ```
 
 Each package uses only those above it. `Wire` is pure, apart from reading from a `Reader`, so a test

@@ -1,0 +1,66 @@
+import fckt.collections.Maps.*
+import fckt.effects.Fail
+import fckt.text.Encodings.*
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.serialization.*
+import uk.m4xy.serialization.Decoding.*
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.net.Network
+import uk.m4xy.http.client.Client
+import uk.m4xy.http.server.*
+import uk.m4xy.http.json.JsonBodies.*
+
+// An item, with its serializer as fk-serialization's processor writes one.
+type Item(name: String, price: Int)
+
+module ItemSerializer : Serializer {
+  type T = Item
+  @Encoder serialize(value: Item): Unit = {
+    beginRecord("Item")
+    encodeField("name")
+    StringSerializer.serialize(value.name)
+    encodeField("price")
+    IntSerializer.serialize(value.price)
+    endRecord()
+  }
+  @Decoder deserialize(): Item = {
+    enterRecord("Item")
+    made = Item(required("Item", "name") { StringSerializer.deserialize() }, required("Item", "price") { IntSerializer.deserialize() })
+    leaveRecord()
+    made
+  }
+}
+
+catalogue: List<Route> = [
+  Route(Get, "/items/{id}", call -> json(ok, ItemSerializer, Item("lamp ${call.params.get("id").getOrElse("?")}", 30))),
+  Route(Post, "/items", call -> receiving(call, ItemSerializer) { item -> json(created, ItemSerializer, item.copy(price = item.price + 1)) }),
+]
+
+// Values go both ways as JSON, which each side says it's sending.
+@Test @Fail @Network valuesAreSentAsJson() = Server.answering(catalogue) {
+  got = Client.get("http://shop.example/items/3")
+  assertEquals(Some("application/json"), got.header("Content-Type"))
+  assertEquals("{\"name\":\"lamp 3\",\"price\":30}", got.text)
+  assertEquals(Item("lamp 3", 30), got.json(ItemSerializer))
+  made = postJson("http://shop.example/items", ItemSerializer, Item("desk", 99))
+  assertEquals(created, made.status)
+  assertEquals(Item("desk", 100), made.json(ItemSerializer))
+}
+
+// A request that sends what isn't what the route reads is the client's mistake, 400, saying why.
+@Test @Fail @Network whatIsntTheValueIsABadRequest() = Server.answering(catalogue) {
+  wrong = Client.post("http://shop.example/items", "{\"name\":\"desk\"}".encodeToBytes(), "application/json")
+  assertEquals(badRequest, wrong.status)
+  assertEquals("Item needs price, which isn't there", wrong.text)
+  assertEquals(badRequest, Client.post("http://shop.example/items", "not json".encodeToBytes(), "application/json").status)
+}
+
+// A response that isn't the value asked for fails, saying why.
+@Test @Fail @Network aResponseThatIsntTheValueFails() = Server.answering([Route(Get, "/", call -> text(ok, "[]"))]) {
+  assertEquals(
+    Error("the response from the server isn't what was asked for: expected Item, an object, not an array"),
+    Fail(fail = (reason, _) -> Error(reason)) { Ok(Client.get("http://shop.example/").json(ItemSerializer)) },
+  )
+}

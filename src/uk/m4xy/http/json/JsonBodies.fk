@@ -1,0 +1,48 @@
+import fckt.effects.Fail
+import fckt.text.Encodings.*
+import uk.m4xy.serialization.Serializer
+import uk.m4xy.serialization.json.Json
+import uk.m4xy.http.*
+import uk.m4xy.http.Headers.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.client.*
+import uk.m4xy.http.server.Call
+
+// Requests and responses whose bodies are values, as JSON, written and read by their serializers,
+// as fk-serialization's processor writes one for each type marked @Serializable:
+//
+//   Client.get("https://shop.example/users/3").json(UserSerializer)
+//   Route(Post, "/users", call -> receiving(call, UserSerializer) { user -> json(created, UserSerializer, saved(user)) })
+module JsonBodies {
+  // The media type JSON is sent as.
+  mediaType: String = "application/json"
+
+  // A response of value, as JSON.
+  json<A>(status: Status, serializer: Serializer<A>, value: A): Response =
+    Response(status, [Header("Content-Type", mediaType)], Json.encode(serializer, value).encodeToBytes())
+
+  // The value the response sent, as JSON; it failing to be one fails.
+  @Fail Response.json<A>(serializer: Serializer<A>): A = when (Json.decode(serializer, this.text)) {
+    Ok(value) -> value
+    Error(reason) -> fail("the response from the server isn't what was asked for: $reason")
+  }
+
+  // The value the request sent, as JSON, or why it isn't one.
+  Request.json<A>(serializer: Serializer<A>): Result<A, String> = Json.decode(serializer, this.text)
+
+  // What respond answers with the value the call's request sent, as JSON; or, where it didn't send
+  // one, 400, saying why, as it's the client that's wrong. respond does @E.
+  receiving<A, @E>(call: Call, serializer: Serializer<A>, respond: @E (A) -> Response): Response = when (call.request.json(serializer)) {
+    Ok(value) -> respond(value)
+    Error(reason) -> text(badRequest, reason)
+  }
+
+  // POSTs value to url, as JSON.
+  @Http @Fail postJson<A>(url: String, serializer: Serializer<A>, value: A): Response =
+    Client.post(url, Json.encode(serializer, value).encodeToBytes(), mediaType)
+
+  // PUTs value to url, as JSON.
+  @Http @Fail putJson<A>(url: String, serializer: Serializer<A>, value: A): Response =
+    Client.send(Request(Put, Client.parsed(url), [Header("Content-Type", mediaType)], Json.encode(serializer, value).encodeToBytes()))
+}
