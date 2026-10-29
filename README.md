@@ -80,7 +80,8 @@ HTTP with 400. Each connection is a task of its own, as `fckt.concurrent` has th
 for a slow client, the others are answered. A connection that receives or sends nothing for
 `timeout`, 30 seconds unless it says otherwise, `serve(port, routes, timeout = Duration(5000))`, is
 answered 400, saying so, and closed. Tasks take turns, one running at a time, so routes never see
-each other half way through anything. `Server.handleNext(listener, routes)` answers a single
+each other half way through anything; `executor`, `InTurn` unless it says otherwise, says in what
+order. `Server.handleNext(listener, routes)` answers a single
 connection, waiting for it as `Network` does.
 
 `Server.answering(routes) { ... }` answers the requests its block sends with the routes, without a

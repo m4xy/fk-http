@@ -5,7 +5,7 @@ import uk.m4xy.http.Statuses.*
 import uk.m4xy.http.net.*
 import uk.m4xy.http.wire.Wire
 import uk.m4xy.http.client.Http
-import fckt.concurrent.Concurrent
+import fckt.concurrent.*
 import fckt.io.Polls
 import fckt.io.Polling
 import fckt.time.Clock
@@ -17,8 +17,9 @@ module Server {
   // Serves routes on port until the program ends. Each connection is a task, which waits for what
   // it receives and sends as PolledSockets does, so while one waits for a slow client the others
   // are answered; the routes take turns, as tasks do, so none sees another half way through. A
-  // connection that receives or sends nothing for timeout is closed.
-  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000)): Nothing = Polls.running {
+  // connection that receives or sends nothing for timeout is closed. The tasks are run as executor
+  // runs them.
+  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = Polls.runningWith(executor) {
     PolledSockets.running(timeout) {
       when (listen(port)) {
         Ok(listener) -> forever(listener, routes, timeout)
