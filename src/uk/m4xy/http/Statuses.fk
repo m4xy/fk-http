@@ -7,9 +7,15 @@ module Statuses {
   found: Status = Status(302)
   notModified: Status = Status(304)
   badRequest: Status = Status(400)
+  unauthorized: Status = Status(401)
+  forbidden: Status = Status(403)
   notFound: Status = Status(404)
   methodNotAllowed: Status = Status(405)
+  conflict: Status = Status(409)
+  unprocessableContent: Status = Status(422)
+  tooManyRequests: Status = Status(429)
   internalServerError: Status = Status(500)
+  serviceUnavailable: Status = Status(503)
 
   // What a response writes after the code: OK, Not Found.
   Status.reason: String = when (this.code) {
@@ -20,9 +26,15 @@ module Statuses {
     302 -> "Found"
     304 -> "Not Modified"
     400 -> "Bad Request"
+    401 -> "Unauthorized"
+    403 -> "Forbidden"
     404 -> "Not Found"
     405 -> "Method Not Allowed"
+    409 -> "Conflict"
+    422 -> "Unprocessable Content"
+    429 -> "Too Many Requests"
     500 -> "Internal Server Error"
+    503 -> "Service Unavailable"
     else -> if (this.isSuccess()) "OK" else if (this.code < 500) "Client Error" else "Server Error"
   }
 
