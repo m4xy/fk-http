@@ -50,6 +50,10 @@ jobs:
       - name: Bootstrap kiln
         working-directory: kiln
         run: opam exec -- ./bootstrap.sh && echo "$HOME/.kiln/bin" >> "$GITHUB_PATH"
+      # fk-serialization's processor reads symbols with fckt.symbols, from fckt.
+      - name: Publish fckt.symbols
+        working-directory: fckt/symbols
+        run: opam exec -- kiln publishLocal
       - name: Publish fk-serialization
         working-directory: fk-serialization
         run: opam exec -- kiln publishLocal
