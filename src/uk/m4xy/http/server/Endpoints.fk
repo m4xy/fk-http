@@ -24,7 +24,7 @@ module Endpoints {
     Route(method, path, call -> when (input.read(call)) {
       Valid(value) -> respond(value)
       Invalid(why) -> text(badRequest, why.joinToString("; "))
-    })
+    }, input.parts)
   }
 
   // The path's parameters the input reads that the path hasn't got.

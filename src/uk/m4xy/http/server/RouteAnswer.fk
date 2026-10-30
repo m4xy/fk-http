@@ -1,0 +1,4 @@
+import uk.m4xy.http.Status
+import uk.m4xy.serialization.Shape
+
+type RouteAnswer(status: Status, shape: Option<Shape>)

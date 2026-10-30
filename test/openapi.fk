@@ -1,0 +1,24 @@
+import fckt.effects.Fail
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.server.*
+import uk.m4xy.http.server.Endpoints.*
+import uk.m4xy.http.server.Inputs.*
+import uk.m4xy.http.server.Routes.*
+import uk.m4xy.http.json.JsonBodies.*
+import uk.m4xy.http.openapi.OpenApi
+import uk.m4xy.serialization.json.JsonText
+
+documented: List<Route> = [
+  get("/items/{id}", param("id")) { id -> json(ok, ItemSerializer, Item(id, 1)) }.answeringJson(ok, ItemSerializer).summarised("An item"),
+  post("/items", body(ItemSerializer)) { item -> json(created, ItemSerializer, item) }.answeringJson(created, ItemSerializer),
+  delete("/items/{id}", param("id")) { _ -> Response(noContent) }.answering(noContent),
+  get("/search", query("q")) { q -> text(ok, q.getOrElse("")) },
+]
+
+@Test documentsEachRoute() = assertEquals(
+  "{\"openapi\":\"3.0.3\",\"info\":{\"title\":\"Shop\",\"version\":\"1.0\"},\"paths\":{\"/items/{id}\":{\"get\":{\"summary\":\"An item\",\"parameters\":[{\"name\":\"id\",\"in\":\"path\",\"required\":true,\"schema\":{\"type\":\"string\"}}],\"responses\":{\"200\":{\"description\":\"OK\",\"content\":{\"application/json\":{\"schema\":{\"\$ref\":\"#/components/schemas/shop.Item\"}}}}}},\"delete\":{\"parameters\":[{\"name\":\"id\",\"in\":\"path\",\"required\":true,\"schema\":{\"type\":\"string\"}}],\"responses\":{\"204\":{\"description\":\"No Content\"}}}},\"/items\":{\"post\":{\"requestBody\":{\"required\":true,\"content\":{\"application/json\":{\"schema\":{\"\$ref\":\"#/components/schemas/shop.Item\"}}}},\"responses\":{\"201\":{\"description\":\"Created\",\"content\":{\"application/json\":{\"schema\":{\"\$ref\":\"#/components/schemas/shop.Item\"}}}}}}},\"/search\":{\"get\":{\"parameters\":[{\"name\":\"q\",\"in\":\"query\",\"required\":false,\"schema\":{\"type\":\"string\"}}],\"responses\":{\"default\":{\"description\":\"what the route answers\"}}}}},\"components\":{\"schemas\":{\"shop.Item\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"price\":{\"type\":\"integer\"}},\"required\":[\"name\",\"price\"]}}}}",
+  JsonText.of(OpenApi.document("Shop", "1.0", documented)),
+)

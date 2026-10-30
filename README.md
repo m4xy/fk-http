@@ -107,6 +107,16 @@ endpoint's function runs. An input that reads a parameter its path hasn't got, a
 `get("/items/{id}", param("slug"))`, is wrong where it's written, so it fails as the endpoint is
 made, when the program starts, not in some call later.
 
+### OpenAPI
+
+Endpoints say what they read, so `OpenApi.document(title, version, routes)` writes an OpenAPI 3
+document of them: each path's operations, their path, query and header parameters, and the body each
+reads, its schema the shape its serializer describes. What a route answers it says itself:
+`.answeringJson(created, ItemSerializer)` for JSON, `.answering(noContent)` for none, and
+`.summarised("...")` says what it's for. Each `@Serializable` type is a schema of its own, named in
+full, referred to wherever it's used. `OpenApi.documenting("/openapi.json", title, version, routes)`
+is a route that serves it.
+
 `Server.serve(port, routes)` serves them until the program ends, and answers anything that isn't
 HTTP with 400. Each connection is a task of its own, as `fckt.concurrent` has them: while one waits
 for a slow client, the others are answered. A connection that receives or sends nothing for
@@ -156,6 +166,7 @@ uk.m4xy.http.wire      Wire: requests and responses as bytes, and read back thro
 uk.m4xy.http.net       Network: connections, plain or TLS, which main handles with Sockets; Connections reads them
 uk.m4xy.http.client    Http: sending requests, which main handles with HttpClient; Client
 uk.m4xy.http.server    Route, Call, Routes, Routers, Endpoints, Inputs and Server
+uk.m4xy.http.openapi   OpenApi, documents of routes
 uk.m4xy.http.json      JsonBodies: requests and responses of values, as JSON, through fk-serialization
 ```
 

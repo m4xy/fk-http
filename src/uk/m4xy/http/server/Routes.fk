@@ -28,4 +28,10 @@ module Routes {
       respond = route.respond
       Route(route.method, route.path, call -> around { respond(call) })
     }
+
+  // The route, described as answering with status and nothing more.
+  Route<@E>.answering<@E>(status: Status): Route<@E> = this.copy(answers = this.answers + [RouteAnswer(status, None)])
+
+  // The route, described in a few words.
+  Route<@E>.summarised<@E>(summary: String): Route<@E> = this.copy(summary = Some(summary))
 }

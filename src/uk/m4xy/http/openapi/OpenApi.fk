@@ -1,0 +1,153 @@
+import fckt.text.Encodings.*
+import uk.m4xy.http.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.server.*
+import uk.m4xy.http.server.InputPart
+import uk.m4xy.serialization.*
+import uk.m4xy.serialization.Shape as SerialShape
+import uk.m4xy.serialization.json.*
+
+// An OpenAPI 3 document of routes: each path's operations, what each reads, and what it answers,
+// with the shapes of what's sent and answered as JSON as schemas, each @Serializable type once.
+module OpenApi {
+  document<@E>(title: String, version: String, routes: List<Route<@E>>): JsonValue = JsonObject([
+    JsonField("openapi", JsonString("3.0.3")),
+    JsonField("info", JsonObject([JsonField("title", JsonString(title)), JsonField("version", JsonString(version))])),
+    JsonField("paths", JsonObject(routes.map { it.path }.distinct().map { path ->
+      JsonField(path, JsonObject(routes.filter { it.path == path }.map { r -> JsonField(MethodText.of(r.method).lowercase(), operation(r)) }))
+    })),
+    JsonField("components", JsonObject([JsonField("schemas", JsonObject(referenced(shapesIn(routes), []).map { name, shape ->
+      JsonField(name, schema(shape))
+    }))])),
+  ])
+
+  // A route serving the routes' document, at path.
+  documenting<@E>(path: String, title: String, version: String, routes: List<Route<@E>>): Route<@E> = {
+    text = JsonText.of(document(title, version, routes))
+    Route(Get, path, _ -> Response(ok, [Header("Content-Type", "application/json")], text.encodeToBytes()))
+  }
+
+  private operation<@E>(r: Route<@E>): JsonValue = {
+    parameters = r.reads.mapNotNull { part ->
+      when (part) {
+        PathPart(name) -> Some(parameter(name, "path", true))
+        QueryPart(name) -> Some(parameter(name, "query", false))
+        HeaderPart(name) -> Some(parameter(name, "header", false))
+        else -> None
+      }
+    }
+    body = r.reads.mapNotNull { part ->
+      when (part) {
+        JsonBodyPart(shape) -> Some(content("application/json", schema(named(shape))))
+        TextBodyPart -> Some(content("text/plain", JsonObject([JsonField("type", JsonString("string"))])))
+        else -> None
+      }
+    }.firstOrNone()
+    JsonObject(
+      r.summary.map { [JsonField("summary", JsonString(it))] }.getOrElse([]) +
+        (if (parameters.isEmpty()) [] else [JsonField("parameters", JsonArray(parameters))]) +
+        body.map { b -> [JsonField("requestBody", JsonObject([JsonField("required", JsonBoolean(true)), b]))] }.getOrElse([]) +
+        [JsonField("responses", responses(r.answers))],
+    )
+  }
+
+  private parameter(name: String, place: String, required: Boolean): JsonValue = JsonObject([
+    JsonField("name", JsonString(name)),
+    JsonField("in", JsonString(place)),
+    JsonField("required", JsonBoolean(required)),
+    JsonField("schema", JsonObject([JsonField("type", JsonString("string"))])),
+  ])
+
+  private content(mediaType: String, schema: JsonValue): JsonField =
+    JsonField("content", JsonObject([JsonField(mediaType, JsonObject([JsonField("schema", schema)]))]))
+
+  private responses(answers: List<RouteAnswer>): JsonValue = when (answers) {
+    [] -> JsonObject([JsonField("default", JsonObject([JsonField("description", JsonString("what the route answers"))]))])
+    else -> JsonObject(answers.map { a ->
+      JsonField("${a.status.code}", JsonObject([JsonField("description", JsonString(a.status.reason))] +
+        a.shape.map { s -> [content("application/json", schema(named(s)))] }.getOrElse([])))
+    })
+  }
+
+  // ---- Schemas ----
+
+  private schema(shape: SerialShape): JsonValue = when (shape) {
+    TextShape -> typed("string")
+    IntegerShape -> typed("integer")
+    NumberShape -> typed("number")
+    BooleanShape -> typed("boolean")
+    CharShape -> JsonObject([JsonField("type", JsonString("string")), JsonField("minLength", JsonNumber("1")), JsonField("maxLength", JsonNumber("1"))])
+    ListShape(item) -> JsonObject([JsonField("type", JsonString("array")), JsonField("items", schema(item))])
+    OptionShape(value) -> nullable(schema(value))
+    MapShape(value) -> JsonObject([JsonField("type", JsonString("object")), JsonField("additionalProperties", schema(value))])
+    RecordShape(_, fields) -> objectOf(fields, [])
+    EnumerationShape(_, values) -> JsonObject([JsonField("type", JsonString("string")), JsonField("enum", JsonArray(values.map { JsonString(it) }))])
+    CasesShape(_, cases) -> JsonObject([
+      JsonField("oneOf", JsonArray(cases.map { c ->
+        objectOf(c.fields, [JsonField("type", JsonObject([JsonField("type", JsonString("string")), JsonField("enum", JsonArray([JsonString(c.name)]))]))])
+      })),
+      JsonField("discriminator", JsonObject([JsonField("propertyName", JsonString("type"))])),
+    ])
+    ReferenceShape(name, _) -> JsonObject([JsonField("\$ref", JsonString("#/components/schemas/$name"))])
+    UnknownShape -> JsonObject([])
+  }
+
+  private typed(name: String): JsonValue = JsonObject([JsonField("type", JsonString(name))])
+
+  private nullable(schema: JsonValue): JsonValue = when (schema) {
+    JsonObject(fields) if fields.none { it.name == "\$ref" } -> JsonObject(fields + [JsonField("nullable", JsonBoolean(true))])
+    other -> JsonObject([JsonField("allOf", JsonArray([other])), JsonField("nullable", JsonBoolean(true))])
+  }
+
+  private objectOf(fields: List<ShapeField>, first: List<JsonField>): JsonValue = {
+    required = first.map { it.name } + fields.filter { it.required }.map { it.name }
+    JsonObject([
+      JsonField("type", JsonString("object")),
+      JsonField("properties", JsonObject(first + fields.map { f -> JsonField(f.name, schema(f.shape)) })),
+    ] + (if (required.isEmpty()) [] else [JsonField("required", JsonArray(required.map { JsonString(it) }))]))
+  }
+
+  // ---- What's referred to ----
+
+  private shapesIn<@E>(routes: List<Route<@E>>): List<SerialShape> =
+    routes.flatMap { r ->
+      r.reads.mapNotNull { part ->
+        when (part) {
+          JsonBodyPart(shape) -> Some(named(shape))
+          else -> None
+        }
+      } + r.answers.mapNotNull { a -> a.shape.map { named(it) } }
+    }
+
+  // A type's own shape, as a reference to it, so it's a schema of its own that the document names.
+  private named(shape: SerialShape): SerialShape = when (shape) {
+    RecordShape(name, _) -> ReferenceShape(name, () -> shape)
+    EnumerationShape(name, _) -> ReferenceShape(name, () -> shape)
+    CasesShape(name, _) -> ReferenceShape(name, () -> shape)
+    other -> other
+  }
+
+  // Each type referred to, by name, with its shape, each once, those it refers to after it.
+  private referenced(toVisit: List<SerialShape>, found: List<(String, SerialShape)>): List<(String, SerialShape)> = when (toVisit) {
+    [] -> found
+    [shape, *rest] -> when (shape) {
+      ReferenceShape(name, described) ->
+        if (found.any { n, _ -> n == name }) referenced(rest, found)
+        else {
+          inner = described()
+          referenced(rest + within(inner), found + [(name, inner)])
+        }
+      other -> referenced(rest + within(other), found)
+    }
+  }
+
+  // The shapes directly inside the shape.
+  private within(shape: SerialShape): List<SerialShape> = when (shape) {
+    ListShape(item) -> [item]
+    OptionShape(value) -> [value]
+    MapShape(value) -> [value]
+    RecordShape(_, fields) -> fields.map { it.shape }
+    CasesShape(_, cases) -> cases.flatMap { c -> c.fields.map { it.shape } }
+    else -> []
+  }
+}

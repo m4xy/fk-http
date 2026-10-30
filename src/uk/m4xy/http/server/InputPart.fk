@@ -1,0 +1,9 @@
+import uk.m4xy.serialization.Shape
+
+type InputPart {
+  PathPart(name: String),
+  QueryPart(name: String),
+  HeaderPart(name: String),
+  TextBodyPart,
+  JsonBodyPart(shape: Shape),
+}

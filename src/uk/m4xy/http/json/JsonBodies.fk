@@ -9,6 +9,9 @@ import uk.m4xy.http.Statuses.*
 import uk.m4xy.http.client.*
 import uk.m4xy.http.server.Call
 import uk.m4xy.http.server.Input
+import uk.m4xy.http.server.InputPart
+import uk.m4xy.http.server.Route
+import uk.m4xy.http.server.RouteAnswer
 import fckt.monads.Validation
 
 // Requests and responses whose bodies are values, as JSON, written and read by their serializers,
@@ -37,7 +40,11 @@ module JsonBodies {
   body<A>(serializer: Serializer<A>): Input<A> = Input([], call -> when (call.request.json(serializer)) {
     Ok(value) -> Valid(value)
     Error(reason) -> Invalid([reason])
-  })
+  }, [JsonBodyPart(serializer.describe())])
+
+  // The route, described as answering with status and a value as JSON.
+  Route<@E>.answeringJson<A, @E>(status: Status, serializer: Serializer<A>): Route<@E> =
+    this.copy(answers = this.answers + [RouteAnswer(status, Some(serializer.describe()))])
 
   // What respond answers with the value the call's request sent, as JSON; or, where it didn't send
   // one, 400, saying why, as it's the client that's wrong. respond does @E.

@@ -18,10 +18,10 @@ module Inputs : Applicative {
 
   pure<A>(x: A): Input<A> = Input([], _ -> Valid(x))
 
-  map<A, B>(m: Input<A>, f: (A) -> B): Input<B> = Input(m.params, call -> Validated.map(m.read(call), f))
+  map<A, B>(m: Input<A>, f: (A) -> B): Input<B> = Input(m.params, call -> Validated.map(m.read(call), f), m.parts)
 
   product<A, B>(ma: Input<A>, mb: Input<B>): Input<(A, B)> =
-    Input(ma.params + mb.params, call -> Validated.product(ma.read(call), mb.read(call)))
+    Input(ma.params + mb.params, call -> Validated.product(ma.read(call), mb.read(call)), ma.parts + mb.parts)
 
   // Nothing: for an endpoint that reads nothing from its calls.
   nothing: Input<Unit> = pure(Unit)
@@ -30,16 +30,16 @@ module Inputs : Applicative {
   param(name: String): Input<String> = Input([name], call -> when (call.params.get(name)) {
     Some(value) -> Valid(value)
     None -> Invalid(["the path has no $name"])
-  })
+  }, [PathPart(name)])
 
   // The query's parameter, as page is 2 in ?page=2, if it has one: + and %xx as what they stand for.
-  query(name: String): Input<Option<String>> = Input([], call -> Valid(queryOf(call.request.url.query.getOrElse("")).find { key, _ -> key == name }.map { _, value -> value }))
+  query(name: String): Input<Option<String>> = Input([], call -> Valid(queryOf(call.request.url.query.getOrElse("")).find { key, _ -> key == name }.map { _, value -> value }), [QueryPart(name)])
 
   // The request's header, if it has one.
-  header(name: String): Input<Option<String>> = Input([], call -> Valid(call.request.header(name)))
+  header(name: String): Input<Option<String>> = Input([], call -> Valid(call.request.header(name)), [HeaderPart(name)])
 
   // The request's body, as text.
-  bodyText: Input<String> = Input([], call -> Valid(call.request.text))
+  bodyText: Input<String> = Input([], call -> Valid(call.request.text), [TextBodyPart])
 
   // What's read, made something else by parse, which says what it must be where it can't: as
   // param("id").as("a number") { it.toIntOrNone() }.
@@ -49,7 +49,7 @@ module Inputs : Applicative {
       None -> Invalid(["'$text' isn't $what"])
     }
     Invalid(why) -> Invalid(why)
-  })
+  }, this.parts)
 
   // A query's parameters, decoded, in the order they're written.
   private queryOf(query: String): List<(String, String)> = query.split("&").filter { it.isNotEmpty() }.map { pair ->
