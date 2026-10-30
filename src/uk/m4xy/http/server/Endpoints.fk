@@ -1,0 +1,35 @@
+import fckt.effects.Fail
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+
+// Routes that say what they read: an endpoint's method, its path, its input, and what it answers
+// with what the input reads.
+//
+//   get("/items/{id}", Inputs.param("id")) { id -> text(ok, "item $id") }
+//
+// A call whose input can't be read is answered 400, with everything wrong with it, before respond
+// runs. An input that reads a parameter the path hasn't got is wrong where it's written, not in
+// any call, so it fails as the endpoint's made: before anything's served.
+module Endpoints {
+  get<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Get, path, input, respond)
+  post<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Post, path, input, respond)
+  put<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Put, path, input, respond)
+  patch<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Patch, path, input, respond)
+  delete<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Delete, path, input, respond)
+
+  endpoint<A, @E>(method: Method, path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = {
+    missing = unknownParams(path, input)
+    if (missing.isNotEmpty()) error("${MethodText.of(method)} $path reads ${missing.map { "{$it}" }.joinToString(", ")}, which its path hasn't got")
+    Route(method, path, call -> when (input.read(call)) {
+      Valid(value) -> respond(value)
+      Invalid(why) -> text(badRequest, why.joinToString("; "))
+    })
+  }
+
+  // The path's parameters the input reads that the path hasn't got.
+  unknownParams<A>(path: String, input: Input<A>): List<String> = {
+    has = Routers.segments(path).filter { Routers.isParam(it) }.map { it.drop(1).dropLast(1) }
+    input.params.filter { !has.contains(it) }
+  }
+}

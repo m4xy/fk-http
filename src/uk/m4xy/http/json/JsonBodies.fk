@@ -8,6 +8,8 @@ import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
 import uk.m4xy.http.client.*
 import uk.m4xy.http.server.Call
+import uk.m4xy.http.server.Input
+import fckt.monads.Validation
 
 // Requests and responses whose bodies are values, as JSON, written and read by their serializers,
 // as fk-serialization's processor writes one for each type marked @Serializable:
@@ -30,6 +32,12 @@ module JsonBodies {
 
   // The value the request sent, as JSON, or why it isn't one.
   Request.json<A>(serializer: Serializer<A>): Result<A, String> = Json.decode(serializer, this.text)
+
+  // An endpoint's input: the value the request sent, as JSON, or why it isn't one.
+  body<A>(serializer: Serializer<A>): Input<A> = Input([], call -> when (call.request.json(serializer)) {
+    Ok(value) -> Valid(value)
+    Error(reason) -> Invalid([reason])
+  })
 
   // What respond answers with the value the call's request sent, as JSON; or, where it didn't send
   // one, 400, saying why, as it's the client that's wrong. respond does @E.

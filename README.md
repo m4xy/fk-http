@@ -66,14 +66,46 @@ Http(send = request -> Ok(text(ok, "stubbed"))) { Client.get("http://shop.exampl
 ## The server
 
 A `Route(method, path, respond)` answers requests with that method and path. A segment in braces,
-such as `{id}`, matches any one segment, and the `Call` has it in `params`. `Routes.respond` gives
-the first matching route's response. When nothing matches, it gives:
+such as `{id}`, matches any one segment, and the `Call` has it in `params`. Routes are found in a
+tree of their paths' segments, `Routers.of(routes)`, not tried in turn, so the order they're
+written in doesn't matter: a fixed segment comes before a parameter, so `/links` goes to the route
+for `/links` and not that for `/{slug}`, and where a fixed segment leads nowhere further, a
+parameter's routes are tried. Two routes for one method whose paths match the same requests, as
+`GET /links/{slug}` and `GET /links/{id}`, are refused before anything is served. When nothing
+matches, `Routes.respond` gives:
 
 - 404 if no route has that path.
 - 405, with `Allow` listing the methods, if routes have that path but not that method.
 - 500 with the reason, if the route fails.
 
 A route can do any effect: a `List<Route<@Db>>` serves routes that use `@Db`.
+`Routes.mounted("/api/users", routes)` puts routes under a prefix, so each part of a service can
+say its own and the service mount them together.
+
+### Endpoints
+
+An endpoint is a route that says what it reads from a call, as an `Input`: a path's parameter,
+`param("id")`; a query's, `query("page")`; a header, `header("Accept")`; the body as text,
+`bodyText`, or as JSON, `body(serializer)`. A block of inputs reads several, and finds everything
+wrong with a call, not just the first, as fk-sqlite's `Columns` do:
+
+```kotlin
+lookup: Input<Lookup> = Inputs {
+  id by param("id").as("a number") { it.toIntOrNone() }
+  page by query("page")
+  Lookup(id, page)
+}
+
+routes: List<Route> = [
+  get("/items/{id}", lookup) { l -> text(ok, "item ${l.id}") },
+  post("/items", body(ItemSerializer)) { item -> json(created, ItemSerializer, saved(item)) },
+]
+```
+
+A call whose input can't be read is answered 400, saying everything that's wrong, before the
+endpoint's function runs. An input that reads a parameter its path hasn't got, as
+`get("/items/{id}", param("slug"))`, is wrong where it's written, so it fails as the endpoint is
+made, when the program starts, not in some call later.
 
 `Server.serve(port, routes)` serves them until the program ends, and answers anything that isn't
 HTTP with 400. Each connection is a task of its own, as `fckt.concurrent` has them: while one waits
@@ -123,7 +155,7 @@ uk.m4xy.http           The model: Request, Response, Method, Status, Url, Header
 uk.m4xy.http.wire      Wire: requests and responses as bytes, and read back through @Reader
 uk.m4xy.http.net       Network: connections, plain or TLS, which main handles with Sockets; Connections reads them
 uk.m4xy.http.client    Http: sending requests, which main handles with HttpClient; Client
-uk.m4xy.http.server    Route, Call, Routes and Server
+uk.m4xy.http.server    Route, Call, Routes, Routers, Endpoints, Inputs and Server
 uk.m4xy.http.json      JsonBodies: requests and responses of values, as JSON, through fk-serialization
 ```
 

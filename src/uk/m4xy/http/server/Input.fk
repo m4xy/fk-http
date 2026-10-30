@@ -1,0 +1,6 @@
+import fckt.monads.Validation
+
+// What an endpoint reads from a call, and how, or why it can't: a path's parameter, a query's,
+// a header, the body. params are the path's parameters it reads, which the endpoint's path must
+// have. Inputs makes them, and a block of them reads several.
+type Input<A>(params: List<String>, read: (Call) -> Validation<A, String>)

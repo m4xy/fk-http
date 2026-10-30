@@ -1,0 +1,78 @@
+import fckt.collections.Maps.*
+import fckt.monads.Validation
+import fckt.monads.Validated
+import fckt.text.Encodings.*
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+
+// What endpoints read from calls. A block of inputs reads each one, and finds everything wrong with
+// a call, not just the first:
+//
+//   Inputs {
+//     id by param("id").as("a number") { it.toIntOrNone() }
+//     page by query("page")
+//     Lookup(id, page)
+//   }
+module Inputs : Applicative {
+  type M<A> = Input<A>
+
+  pure<A>(x: A): Input<A> = Input([], _ -> Valid(x))
+
+  map<A, B>(m: Input<A>, f: (A) -> B): Input<B> = Input(m.params, call -> Validated.map(m.read(call), f))
+
+  product<A, B>(ma: Input<A>, mb: Input<B>): Input<(A, B)> =
+    Input(ma.params + mb.params, call -> Validated.product(ma.read(call), mb.read(call)))
+
+  // Nothing: for an endpoint that reads nothing from its calls.
+  nothing: Input<Unit> = pure(Unit)
+
+  // The path's parameter, as slug is docs in /links/docs for /links/{slug}.
+  param(name: String): Input<String> = Input([name], call -> when (call.params.get(name)) {
+    Some(value) -> Valid(value)
+    None -> Invalid(["the path has no $name"])
+  })
+
+  // The query's parameter, as page is 2 in ?page=2, if it has one: + and %xx as what they stand for.
+  query(name: String): Input<Option<String>> = Input([], call -> Valid(queryOf(call.request.url.query.getOrElse("")).find { key, _ -> key == name }.map { _, value -> value }))
+
+  // The request's header, if it has one.
+  header(name: String): Input<Option<String>> = Input([], call -> Valid(call.request.header(name)))
+
+  // The request's body, as text.
+  bodyText: Input<String> = Input([], call -> Valid(call.request.text))
+
+  // What's read, made something else by parse, which says what it must be where it can't: as
+  // param("id").as("a number") { it.toIntOrNone() }.
+  Input<String>.as<B>(what: String, parse: (String) -> Option<B>): Input<B> = Input(this.params, call -> when (this.read(call)) {
+    Valid(text) -> when (parse(text)) {
+      Some(value) -> Valid(value)
+      None -> Invalid(["'$text' isn't $what"])
+    }
+    Invalid(why) -> Invalid(why)
+  })
+
+  // A query's parameters, decoded, in the order they're written.
+  private queryOf(query: String): List<(String, String)> = query.split("&").filter { it.isNotEmpty() }.map { pair ->
+    (decoded(pair.substringBefore("=")), if (pair.contains("=")) decoded(pair.substringAfter("=")) else "")
+  }
+
+  // Text from a query, + a space and %xx the byte xx; left as it is where that isn't UTF-8.
+  private decoded(text: String): String = bytesOf(unescaped(text.encodeToBytes().toList())).decodeUtf8().getOrElse(text)
+
+  private unescaped(bytes: List<Byte>): List<Byte> = when (bytes) {
+    [] -> []
+    [b, h, l, *rest] if b == '%'.code.toByte() && hex(h).isSome() && hex(l).isSome() ->
+      [(hex(h).getOrElse(0) * 16 + hex(l).getOrElse(0)).toByte(), *unescaped(rest)]
+    [b, *rest] if b == '+'.code.toByte() -> [' '.code.toByte(), *unescaped(rest)]
+    [b, *rest] -> [b, *unescaped(rest)]
+  }
+
+  // What the hexadecimal digit stands for, if it's one.
+  private hex(b: Byte): Option<Int> = {
+    c = b.toInt()
+    if (c >= '0'.code && c <= '9'.code) Some(c - '0'.code)
+    else if (c >= 'a'.code && c <= 'f'.code) Some(c - 'a'.code + 10)
+    else if (c >= 'A'.code && c <= 'F'.code) Some(c - 'A'.code + 10)
+    else None
+  }
+}

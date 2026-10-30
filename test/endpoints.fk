@@ -1,0 +1,48 @@
+import fckt.effects.Fail
+import fckt.text.Encodings.*
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.server.*
+import uk.m4xy.http.server.Endpoints.*
+import uk.m4xy.http.server.Inputs.*
+
+// Endpoints, which say what they read from calls.
+
+type Lookup(id: Int, page: Option<String>)
+
+lookup: Input<Lookup> = Inputs {
+  id by param("id").as("a number") { it.toIntOrNone() }
+  page by query("page")
+  Lookup(id, page)
+}
+
+shelf: List<Route> = [
+  get("/items/{id}", lookup) { l -> text(ok, "item ${l.id}, page ${l.page.getOrElse("1")}") },
+  post("/items", Inputs.bodyText) { body -> text(created, "made $body") },
+]
+
+@Fail asked(method: Method, target: String, body: String = ""): Response = {
+  url = Url(Http, "shop.example", 80, target.substringBefore("?"), if (target.contains("?")) Some(target.substringAfter("?")) else None)
+  Routes.respond(shelf, Request(method, url, [], body.encodeToBytes()))
+}
+
+@Test @Fail whatAnEndpointReadsIsGivenItsResponder() = {
+  assertEquals("item 3, page 1", asked(Get, "/items/3").text)
+  assertEquals("item 3, page two words", asked(Get, "/items/3?page=two+words&x=1").text)
+  assertEquals("item 3, page 50%", asked(Get, "/items/3?page=50%25").text)
+  assertEquals("made a lamp", asked(Post, "/items", "a lamp").text)
+}
+
+@Test @Fail aCallThatCantBeReadIsABadRequest() = {
+  wrong = asked(Get, "/items/three")
+  assertEquals(badRequest, wrong.status)
+  assertEquals("'three' isn't a number", wrong.text)
+}
+
+// An input that reads a parameter its path hasn't got is wrong where it's written.
+@Test @Fail paramsThePathHasntGotAreFound() = {
+  assertEquals(["slug"], Endpoints.unknownParams("/links/{id}", Inputs.param("slug")))
+  assertEquals([], Endpoints.unknownParams("/items/{id}", lookup))
+}
