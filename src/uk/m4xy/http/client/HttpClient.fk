@@ -4,8 +4,6 @@ import uk.m4xy.http.*
 import uk.m4xy.http.net.*
 import uk.m4xy.http.wire.Wire
 
-// Sends a request over a connection of its own, through TLS for an https URL, which is closed once
-// the response is read.
 module HttpClient : Http {
   @Network send(request: Request): Result<Response, String> = {
     url = request.url

@@ -1,5 +1,4 @@
 import fckt.text.Bytes
 import fckt.text.Encodings.*
 
-// What a client asks of a server: the method, what it's asked of, the headers, and what's sent.
 type Request(method: Method, url: Url, headers: List<Header> = [], body: Bytes = "".encodeToBytes())

@@ -4,11 +4,6 @@ import fckt.io.Polls.*
 import fckt.time.Clock
 import fckt.time.Duration
 
-// The machine's sockets, as Sockets has them, but waiting as Polls does: where a task would wait to
-// accept, receive or send, it parks, and the others go on. A handler's code runs where it's
-// installed, so a task that's to wait so has it around its own code. Connecting and TLS's handshake
-// still wait, as the system does them. What waits longer than timeout to receive or send is an
-// Error, so a connection the other end has left open, and gone quiet on, ends.
 module PolledSockets {
   @Concurrent<@Polling @Clock @E> @Polling @Clock running<A, @E>(timeout: Duration, block: @Network @E () -> A): A = Network(
     connect = (host, port, security) -> Sockets.connect(host, port, security),

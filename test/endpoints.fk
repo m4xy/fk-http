@@ -8,8 +8,6 @@ import uk.m4xy.http.server.*
 import uk.m4xy.http.server.Endpoints.*
 import uk.m4xy.http.server.Inputs.*
 
-// Endpoints, which say what they read from calls.
-
 type Lookup(id: Int, page: Option<String>)
 
 lookup: Input<Lookup> = Inputs {
@@ -41,7 +39,6 @@ shelf: List<Route> = [
   assertEquals("'three' isn't a number", wrong.text)
 }
 
-// An input that reads a parameter its path hasn't got is wrong where it's written.
 @Test @Fail paramsThePathHasntGotAreFound() = {
   assertEquals(["slug"], Endpoints.unknownParams("/links/{id}", Inputs.param("slug")))
   assertEquals([], Endpoints.unknownParams("/items/{id}", lookup))

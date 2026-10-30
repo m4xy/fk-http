@@ -9,7 +9,6 @@ import uk.m4xy.http.client.*
 import uk.m4xy.http.net.*
 import uk.m4xy.http.server.*
 
-// Over real sockets: a server, in a copy of this program, answers a client in this one.
 @Test @Fail @Network @Http aClientAndServerTalkOverTheNetwork() = {
   listener = when (listen(0)) {
     Ok(l) -> l
@@ -23,7 +22,6 @@ import uk.m4xy.http.server.*
   }
   stop(listener)
   answered = attempt { Client.get("http://localhost:$port/hello/world") }
-  // The server's done, or, if the client never reached it, made to be.
   ended(server)
   response = when (answered) {
     Ok(r) -> r
@@ -32,14 +30,9 @@ import uk.m4xy.http.server.*
   assertEquals(ok, response.status)
   assertEquals("hello world", response.text)
   assertEquals(Some("text/plain; charset=utf-8"), response.header("Content-Type"))
-  // Where nothing is listening, there's no response.
   assertEquals(Error("localhost:$port: Connection refused"), Http.send(Request(Get, Url(Http, "localhost", port))).map { it.status })
 }
 
-// A copy of this program, which serves: 0 in the copy, and its process id in the original, which
-// goes on to be the client.
 private external forked(u: Unit): Int = "(fun _ -> Unix.fork ()) u"
-// Waits for the copy to end, ending it if it hasn't.
 private external ended(pid: Int): Unit = "(fun p -> (try Unix.kill p Sys.sigterm with Unix.Unix_error _ -> ()); ignore (Unix.waitpid [] p)) pid"
-// Ends the copy without flushing what the original has yet to print, which it would print twice.
 private external exitNow(code: Int): Nothing = "Unix._exit code"

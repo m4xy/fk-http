@@ -1,8 +1,6 @@
 import fckt.text.Bytes
 import fckt.io.Descriptor
 
-// The machine's TCP sockets, which main handles @Network with, and OpenSSL's TLS over them. Sending
-// to a connection the other end has closed is an Error, not the end of the program.
 module Sockets : Network {
   connect(host: String, port: Int, security: Security): Result<Connection, String> = when (tcpConnect(host, port)) {
     Ok(socket) -> when (security) {
@@ -19,16 +17,12 @@ module Sockets : Network {
   close(connection: Connection): Unit = closed(connection)
   stop(listener: Listener): Unit = closeListener(listener)
 
-  // A socket connected to the first of host's addresses that takes one.
   private external tcpConnect(host: String, port: Int): Result<Descriptor, String> =
     "(fun h p -> Sys.set_signal Sys.sigpipe Sys.Signal_ignore; let rec first last = function [] -> Error (h ^ \":\" ^ string_of_int p ^ \": \" ^ last) | info :: rest -> (let s = Unix.socket info.Unix.ai_family Unix.SOCK_STREAM 0 in try Unix.connect s info.Unix.ai_addr; Ok s with Unix.Unix_error (e, _, _) -> Unix.close s; first (Unix.error_message e) rest) in match Unix.getaddrinfo h (string_of_int p) [Unix.AI_SOCKTYPE Unix.SOCK_STREAM] with [] -> Error (\"no address for \" ^ h) | infos -> first \"no address\" infos | exception Unix.Unix_error (e, _, _) -> Error (h ^ \": \" ^ Unix.error_message e)) host port"
 
-  // The socket, as it is: what it receives and sends is what goes over the network.
   private external plainOver(socket: Descriptor): Connection =
     "(fun s -> let buf = Bytes.create 65536 in let rec receive () = match Unix.read s buf 0 65536 with n -> Ok (Bytes.sub_string buf 0 n) | exception Unix.Unix_error (Unix.EINTR, _, _) -> receive () | exception Unix.Unix_error (e, _, _) -> Error (Unix.error_message e) in let send b = (try let rec go o = if o < String.length b then go (o + Unix.write_substring s b o (String.length b - o)) in go 0; Ok () with Unix.Unix_error (e, _, _) -> Error (Unix.error_message e)) in (s, (fun () -> false), receive, send, (fun () -> try Unix.close s with Unix.Unix_error _ -> ()))) socket"
 
-  // TLS over the socket, to host: its certificate must be signed by one the machine's OpenSSL
-  // trusts, and be for host; otherwise there's no connection, and why.
   private external tlsOver(socket: Descriptor, host: String): Result<Connection, String> =
     "(fun s h -> let failed what = (match (Ssl.Error.get_error ()).Ssl.Error.reason with Some r -> h ^ \": TLS failed \" ^ what ^ \": \" ^ r | None -> h ^ \": TLS failed \" ^ what) in try Ssl.init (); let ctx = Ssl.create_context Ssl.TLSv1_2 Ssl.Client_context in ignore (Ssl.set_default_verify_paths ctx); Ssl.set_verify ctx [Ssl.Verify_peer] None; let t = Ssl.embed_socket s ctx in Ssl.set_client_SNI_hostname t h; Ssl.set_host t h; match Ssl.connect t with exception Ssl.Connection_error _ -> (let v = Ssl.get_verify_result t in let why = if v <> 0 then h ^ \"'s certificate isn't trusted: \" ^ Ssl.get_verify_error_string v else failed \"to connect\" in (try Unix.close s with Unix.Unix_error _ -> ()); Error why) | () -> (let buf = Bytes.create 65536 in let receive () = (match Ssl.read t buf 0 65536 with n -> Ok (Bytes.sub_string buf 0 n) | exception Ssl.Read_error (Ssl.Error_zero_return | Ssl.Error_syscall) -> Ok \"\" | exception Ssl.Read_error _ -> Error (failed \"receiving\")) in let send b = (try Ssl.output_string t b; Ok () with Ssl.Write_error _ -> Error (failed \"sending\")) in let close () = (try Ssl.shutdown t with _ -> ()); (try Unix.close s with Unix.Unix_error _ -> ()) in Ok (s, (fun () -> true), receive, send, close)) with Ssl.Method_error | Ssl.Context_error -> (try Unix.close s with Unix.Unix_error _ -> ()); Error (failed \"to start\")) socket host"
 
@@ -43,8 +37,6 @@ module Sockets : Network {
   private external closed(connection: Connection): Unit = "(fun (_, _, _, _, close) -> close ()) connection"
   private external closeListener(listener: Listener): Unit = "(fun l -> try Unix.close l with Unix.Unix_error _ -> ()) listener"
 
-  // What the connection's over, which is ready to read when there's something to receive, unless
-  // what's received is held by TLS: buffered says so.
   internal external descriptorOf(connection: Connection): Descriptor = "(fun (s, _, _, _, _) -> s) connection"
   internal external buffered(connection: Connection): Boolean = "(fun (_, b, _, _, _) -> b ()) connection"
   internal external listenerDescriptor(listener: Listener): Descriptor = "listener"

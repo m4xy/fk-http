@@ -5,14 +5,7 @@ import uk.m4xy.http.*
 import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
 
-// Finding the route for a request. A path's fixed segment comes before a parameter where both
-// could match, whatever order the routes are in: /links goes to the route for /links, not that for
-// /{slug}. Where the fixed segment's routes have nothing further on for the path, a parameter's are
-// tried: /links/1/visits may go to /{owner}/{id}/visits.
 module Routers {
-  // The router for the routes, or why they can't be served together: two routes for one method
-  // whose paths match the same requests, as GET /links/{slug} and GET /links/{id} do, would leave
-  // one never answering.
   of<@E>(routes: List<Route<@E>>): Result<Router<@E>, String> = {
     root = routes.fold(empty()) { node, route -> added(node, segments(route.path), route) }
     when (clashes(root)) {
@@ -21,8 +14,6 @@ module Routers {
     }
   }
 
-  // The response of the route for the request's method and path: 404 if none is for its path, 405
-  // if none of those is for its method, and 500 if it fails.
   respond<@E>(router: Router<@E>, request: Request): Response = {
     path = segments(request.url.path)
     ends = endsOf(router.root, path)
@@ -42,14 +33,11 @@ module Routers {
     }
   }
 
-  // A path's segments, after its first /: /links/{slug} is links and {slug}, and /links/ is links and
-  // an empty one, which no parameter matches.
   segments(path: String): List<String> = when (path.split("/")) {
     ["", *rest] -> rest
     all -> all
   }
 
-  // Whether a path's segment is a parameter, {slug}, and so matches any one segment.
   isParam(segment: String): Boolean = segment.startsWith("{") && segment.endsWith("}")
 
   private empty<@E>(): RouteNode<@E> = RouteNode([], emptyMap(), None)
@@ -60,7 +48,6 @@ module Routers {
     [segment, *rest] -> node.copy(fixed = node.fixed.put(segment, added(node.fixed.get(segment).getOrElse(empty()), rest, route)))
   }
 
-  // Each pair of routes at one node for one method, which match the same requests.
   private clashes<@E>(node: RouteNode<@E>): List<String> = {
     here = node.routes.mapIndexed { i, route ->
       node.routes.drop(i + 1).filter { it.method == route.method }.map { other ->
@@ -70,8 +57,6 @@ module Routers {
     here + node.fixed.toList().flatMap { _, next -> clashes(next) } + node.param.map { clashes(it) }.getOrElse([])
   }
 
-  // The nodes the path ends at that have routes, the best first: a fixed segment's before a
-  // parameter's.
   private endsOf<@E>(node: RouteNode<@E>, path: List<String>): List<RouteNode<@E>> = when (path) {
     [] -> if (node.routes.isEmpty()) [] else [node]
     [segment, *rest] ->
@@ -79,7 +64,6 @@ module Routers {
         (if (segment.isEmpty()) [] else node.param.map { endsOf(it, rest) }.getOrElse([]))
   }
 
-  // What the path's segments are for each of the pattern's parameters, by name.
   private paramsOf(pattern: List<String>, path: List<String>, params: Map<String, String>): Map<String, String> = when (pattern, path) {
     ([p, *ps], [s, *ss]) -> paramsOf(ps, ss, if (isParam(p)) params.put(p.drop(1).dropLast(1), s) else params)
     _ -> params

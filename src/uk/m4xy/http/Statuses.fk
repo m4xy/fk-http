@@ -1,4 +1,3 @@
-// The statuses, by name, and what a status says of a response.
 module Statuses {
   ok: Status = Status(200)
   created: Status = Status(201)
@@ -17,7 +16,6 @@ module Statuses {
   internalServerError: Status = Status(500)
   serviceUnavailable: Status = Status(503)
 
-  // What a response writes after the code: OK, Not Found.
   Status.reason: String = when (this.code) {
     200 -> "OK"
     201 -> "Created"
@@ -38,9 +36,7 @@ module Statuses {
     else -> if (this.isSuccess()) "OK" else if (this.code < 500) "Client Error" else "Server Error"
   }
 
-  // That it worked: a code 200 to 299.
   Status.isSuccess(): Boolean = this.code >= 200 && this.code < 300
 
-  // That the response has no body, whatever its headers say.
   Status.isBodiless(): Boolean = (this.code >= 100 && this.code < 200) || this.code == 204 || this.code == 304
 }

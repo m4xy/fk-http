@@ -6,17 +6,12 @@ import uk.m4xy.http.Statuses.*
 import uk.m4xy.http.client.*
 import uk.m4xy.http.net.Network
 
-// Over the internet, so these need it: example.com, and badssl.com's hosts, whose certificates
-// are wrong on purpose.
-
-// An https URL is sent through TLS, and what comes back is read as it is over plain HTTP.
 @Test @Fail @Network @Http httpsIsSentThroughTls() = {
   response = Client.get("https://example.com/")
   assertEquals(ok, response.status)
   expectContains(response.text, "Example Domain")
 }
 
-// A host whose certificate the machine doesn't trust, or that isn't the host's, isn't answered.
 @Test @Network @Http aCertificateThatIsntTrustedIsRefused() = {
   assertEquals(Error("expired.badssl.com's certificate isn't trusted: certificate has expired"), statusOf("expired.badssl.com"))
   assertEquals(Error("wrong.host.badssl.com's certificate isn't trusted: hostname mismatch"), statusOf("wrong.host.badssl.com"))

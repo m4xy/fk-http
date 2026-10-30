@@ -1,6 +1,4 @@
 import uk.m4xy.http.Request
 import fckt.collections.Maps.Map
 
-// A request as a route has it: with what its path's parameters matched, as id is 3 in /items/3
-// for the route /items/{id}.
 type Call(request: Request, params: Map<String, String>)

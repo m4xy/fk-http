@@ -11,8 +11,6 @@ import uk.m4xy.http.server.*
 import fckt.time.Duration
 import fckt.text.Encodings.*
 
-// A client that connects and says nothing keeps no other waiting: the server, in a copy of this
-// program, answers the others meanwhile.
 @Test @Fail @Network @Http aSlowClientKeepsNoOtherWaiting() = {
   port = freePort()
   server = forkedServer(Unit)
@@ -24,13 +22,11 @@ import fckt.text.Encodings.*
   answered = attempt {
     [1, 2, 3].map { Client.get("http://localhost:$port/hello").text }
   }
-  // The server, still answering, for ever, is made to stop.
   silent.forEach { close(it) }
   stopped(server)
   assertEquals(Ok(["hello", "hello", "hello"]), answered)
 }
 
-// A connection that sends nothing for the server's timeout is answered 400, saying so, and closed.
 @Test @Fail @Network aQuietConnectionIsClosed() = {
   port = freePort()
   server = forkedServer(Unit)
@@ -47,7 +43,6 @@ import fckt.text.Encodings.*
   assertEquals(Some(Ok("")), closed)
 }
 
-// A port nothing's listening on now.
 @Network @Fail freePort(): Int = when (listen(0)) {
   Ok(listener) -> {
     port = portOf(listener)
@@ -57,8 +52,6 @@ import fckt.text.Encodings.*
   Error(reason) -> fail(reason)
 }
 
-// A connection to port, once the server's listening on it, trying every 20 milliseconds, tries
-// times; it sends nothing.
 @Network connected(port: Int, tries: Int): Option<Connection> = when (connect("localhost", port, Plain)) {
   Ok(connection) -> Some(connection)
   Error(_) -> if (tries > 0) {

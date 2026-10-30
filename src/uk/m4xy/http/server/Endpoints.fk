@@ -3,14 +3,6 @@ import uk.m4xy.http.*
 import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
 
-// Routes that say what they read: an endpoint's method, its path, its input, and what it answers
-// with what the input reads.
-//
-//   get("/items/{id}", Inputs.param("id")) { id -> text(ok, "item $id") }
-//
-// A call whose input can't be read is answered 400, with everything wrong with it, before respond
-// runs. An input that reads a parameter the path hasn't got is wrong where it's written, not in
-// any call, so it fails as the endpoint's made: before anything's served.
 module Endpoints {
   get<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Get, path, input, respond)
   post<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Post, path, input, respond)
@@ -27,7 +19,6 @@ module Endpoints {
     }, input.parts)
   }
 
-  // The path's parameters the input reads that the path hasn't got.
   unknownParams<A>(path: String, input: Input<A>): List<String> = {
     has = Routers.segments(path).filter { Routers.isParam(it) }.map { it.drop(1).dropLast(1) }
     input.params.filter { !has.contains(it) }

@@ -16,7 +16,6 @@ shop: List<Route> = [
   Route(Get, "/broken", call -> fail("the shelf fell")),
 ]
 
-// A client's requests are answered by the routes for them, as a server of them would.
 @Test @Fail @Network requestsAreAnsweredByTheirRoute() = Server.answering(shop) {
   assertEquals("all the items", Client.get("http://shop.example/items").text)
   assertEquals("item 3", Client.get("http://shop.example/items/3").text)
@@ -25,13 +24,10 @@ shop: List<Route> = [
   assertEquals("made a lamp", made.text)
 }
 
-// What no route is for, isn't found; what a route's for but not with that method, says what is;
-// and a route that fails says why.
 @Test @Fail @Network whatNoRouteAnswersSaysSo() = Server.answering(shop) {
   missing = Client.get("http://shop.example/nothing")
   assertEquals(notFound, missing.status)
   assertEquals("nothing is at /nothing", missing.text)
-  // A parameter matches one segment, never none.
   assertEquals(notFound, Client.get("http://shop.example/items/").status)
   wrong = Client.send(Request(Delete, Url(Http, "shop.example", 80, "/items")))
   assertEquals(methodNotAllowed, wrong.status)

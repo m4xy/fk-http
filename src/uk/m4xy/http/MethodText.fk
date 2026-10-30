@@ -1,6 +1,5 @@
 import fckt.text.Format
 
-// A method as a request writes it: GET, POST.
 module MethodText : Format {
   type T = Method
   of(value: Method): String = value.name.uppercase()

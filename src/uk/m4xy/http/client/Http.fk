@@ -1,10 +1,6 @@
 import uk.m4xy.http.*
 import uk.m4xy.http.net.Network
 
-// Sending requests. Main handles it with HttpClient, over the network, so what does it may use
-// the network, as its @Network says; a test can answer it itself, or with routes, as
-// Server.answering does, without a socket.
 @Network @HandledBy(HttpClient) effect Http {
-  // The response to request, or why there's none.
   send(request: Request): Result<Response, String>
 }

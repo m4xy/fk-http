@@ -1,2 +1,1 @@
-// A port a server is listening on, for connections to accept.
 external type Listener = "Unix.file_descr"

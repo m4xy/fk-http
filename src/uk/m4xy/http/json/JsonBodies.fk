@@ -14,50 +14,35 @@ import uk.m4xy.http.server.Route
 import uk.m4xy.http.server.RouteAnswer
 import fckt.monads.Validation
 
-// Requests and responses whose bodies are values, as JSON, written and read by their serializers,
-// as fk-serialization's processor writes one for each type marked @Serializable:
-//
-//   Client.get("https://shop.example/users/3").json(UserSerializer)
-//   Route(Post, "/users", call -> receiving(call, UserSerializer) { user -> json(created, UserSerializer, saved(user)) })
 module JsonBodies {
-  // The media type JSON is sent as.
   mediaType: String = "application/json"
 
-  // A response of value, as JSON.
   json(status: Status, serializer: Serializer, value: serializer.T): Response =
     Response(status, [Header("Content-Type", mediaType)], Json.encode(serializer, value).encodeToBytes())
 
-  // The value the response sent, as JSON; it failing to be one fails.
   @Fail Response.json(serializer: Serializer): serializer.T = when (Json.decode(serializer, this.text)) {
     Ok(value) -> value
     Error(reason) -> fail("the response from the server isn't what was asked for: $reason")
   }
 
-  // The value the request sent, as JSON, or why it isn't one.
   Request.json(serializer: Serializer): Result<serializer.T, String> = Json.decode(serializer, this.text)
 
-  // An endpoint's input: the value the request sent, as JSON, or why it isn't one.
   body(serializer: Serializer): Input<serializer.T> = Input([], call -> when (call.request.json(serializer)) {
     Ok(value) -> Valid(value)
     Error(reason) -> Invalid([reason])
   }, [JsonBodyPart(serializer.describe())])
 
-  // The route, described as answering with status and a value as JSON.
   Route<@E>.answeringJson<@E>(status: Status, serializer: Serializer): Route<@E> =
     this.copy(answers = this.answers + [RouteAnswer(status, Some(serializer.describe()))])
 
-  // What respond answers with the value the call's request sent, as JSON; or, where it didn't send
-  // one, 400, saying why, as it's the client that's wrong. respond does @E.
   receiving<@E>(call: Call, serializer: Serializer, respond: @E (serializer.T) -> Response): Response = when (call.request.json(serializer)) {
     Ok(value) -> respond(value)
     Error(reason) -> text(badRequest, reason)
   }
 
-  // POSTs value to url, as JSON.
   @Http @Fail postJson(url: String, serializer: Serializer, value: serializer.T): Response =
     Client.post(url, Json.encode(serializer, value).encodeToBytes(), mediaType)
 
-  // PUTs value to url, as JSON.
   @Http @Fail putJson(url: String, serializer: Serializer, value: serializer.T): Response =
     Client.send(Request(Put, Client.parsed(url), [Header("Content-Type", mediaType)], Json.encode(serializer, value).encodeToBytes()))
 }

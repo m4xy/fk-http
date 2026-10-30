@@ -1,6 +1,1 @@
-// An open connection to another program, over the network, plain or through TLS: Network
-// receives what it sends, sends to it, and closes it, the same whichever it is. It's kept with the
-// descriptor it's over, and whether what's received may be held where the descriptor being ready
-// to read can't say: TLS's always may, as OpenSSL can hold what it's read, and the ssl package
-// can't say whether it does.
 external type Connection = "Unix.file_descr * (unit -> bool) * (unit -> (string, string) result) * (string -> (unit, string) result) * (unit -> unit)"

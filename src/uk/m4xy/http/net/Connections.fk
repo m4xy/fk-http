@@ -4,16 +4,12 @@ import fckt.text.Bytes
 import fckt.text.Encodings.*
 import fckt.values.Mutable
 
-// Reading what a connection receives a line or some bytes at a time, as it comes.
 module Connections {
-  // Runs body reading what connection receives: what's received and not yet read is kept for the
-  // next read.
   @Network @Fail reading<A>(connection: Connection, body: @Reader () -> A): A = {
     kept = Mutable(Kept("".encodeToBytes(), false))
     Reader(nextLine = () -> line(connection, kept), nextBytes = count -> bytes(connection, kept, count)) { body() }
   }
 
-  // The next line, without its end, or None if there's nothing left.
   @Network @Fail @Mutating private line(connection: Connection, kept: Mutable<Kept>): Option<String> = {
     k = kept.value
     at = indexOfNewline(k.bytes)
@@ -29,8 +25,6 @@ module Connections {
     }
   }
 
-  // The next count bytes, or fewer if the connection ends first; all that's left if count is
-  // below 0.
   @Network @Fail @Mutating private bytes(connection: Connection, kept: Mutable<Kept>, count: Int): Bytes = {
     k = kept.value
     if (count >= 0 && k.bytes.size >= count) {
@@ -45,7 +39,6 @@ module Connections {
     }
   }
 
-  // What the connection receives next, kept: or that it's ended.
   @Network @Fail @Mutating private more(connection: Connection, kept: Mutable<Kept>): Unit = when (receive(connection)) {
     Ok(received) -> {
       kept.value = if (received.size == 0) kept.value.copy(ended = true) else kept.value.copy(bytes = kept.value.bytes + received)
@@ -57,5 +50,4 @@ module Connections {
   private external slice(bytes: Bytes, from: Int, count: Int): Bytes = "String.sub bytes from count"
 }
 
-// What's been received and not yet read, and whether the connection's ended.
 private type Kept(bytes: Bytes, ended: Boolean)

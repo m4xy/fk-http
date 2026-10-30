@@ -2,22 +2,17 @@ import fckt.effects.Fail
 import fckt.text.Bytes
 import uk.m4xy.http.*
 
-// Sending requests, through @Http, failing where there's no response: one that says it didn't
-// work is still a response, to look at its status.
 module Client {
   @Http @Fail send(request: Request): Response = when (Http.send(request)) {
     Ok(response) -> response
     Error(reason) -> fail(reason)
   }
 
-  // GETs url.
   @Http @Fail get(url: String): Response = send(Request(Get, parsed(url)))
 
-  // POSTs body to url, as contentType says it is.
   @Http @Fail post(url: String, body: Bytes, contentType: String): Response =
     send(Request(Post, parsed(url), [Header("Content-Type", contentType)], body))
 
-  // The URL url says; it not being one fails.
   @Fail parsed(url: String): Url = when (UrlText.read(url)) {
     Ok(u) -> u
     Error(reason) -> fail(reason)

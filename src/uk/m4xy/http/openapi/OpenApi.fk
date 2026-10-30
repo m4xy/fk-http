@@ -7,8 +7,6 @@ import uk.m4xy.serialization.*
 import uk.m4xy.serialization.Shape as SerialShape
 import uk.m4xy.serialization.json.*
 
-// An OpenAPI 3 document of routes: each path's operations, what each reads, and what it answers,
-// with the shapes of what's sent and answered as JSON as schemas, each @Serializable type once.
 module OpenApi {
   document<@E>(title: String, version: String, routes: List<Route<@E>>): JsonValue = JsonObject([
     JsonField("openapi", JsonString("3.0.3")),
@@ -21,7 +19,6 @@ module OpenApi {
     }))])),
   ])
 
-  // A route serving the routes' document, at path.
   documenting<@E>(path: String, title: String, version: String, routes: List<Route<@E>>): Route<@E> = {
     text = JsonText.of(document(title, version, routes))
     Route(Get, path, _ -> Response(ok, [Header("Content-Type", "application/json")], text.encodeToBytes()))
@@ -69,8 +66,6 @@ module OpenApi {
     })
   }
 
-  // ---- Schemas ----
-
   private schema(shape: SerialShape): JsonValue = when (shape) {
     TextShape -> typed("string")
     IntegerShape -> typed("integer")
@@ -107,8 +102,6 @@ module OpenApi {
     ] + (if (required.isEmpty()) [] else [JsonField("required", JsonArray(required.map { JsonString(it) }))]))
   }
 
-  // ---- What's referred to ----
-
   private shapesIn<@E>(routes: List<Route<@E>>): List<SerialShape> =
     routes.flatMap { r ->
       r.reads.mapNotNull { part ->
@@ -119,7 +112,6 @@ module OpenApi {
       } + r.answers.mapNotNull { a -> a.shape.map { named(it) } }
     }
 
-  // A type's own shape, as a reference to it, so it's a schema of its own that the document names.
   private named(shape: SerialShape): SerialShape = when (shape) {
     RecordShape(name, _) -> ReferenceShape(name, () -> shape)
     EnumerationShape(name, _) -> ReferenceShape(name, () -> shape)
@@ -127,7 +119,6 @@ module OpenApi {
     other -> other
   }
 
-  // Each type referred to, by name, with its shape, each once, those it refers to after it.
   private referenced(toVisit: List<SerialShape>, found: List<(String, SerialShape)>): List<(String, SerialShape)> = when (toVisit) {
     [] -> found
     [shape, *rest] -> when (shape) {
@@ -141,7 +132,6 @@ module OpenApi {
     }
   }
 
-  // The shapes directly inside the shape.
   private within(shape: SerialShape): List<SerialShape> = when (shape) {
     ListShape(item) -> [item]
     OptionShape(value) -> [value]

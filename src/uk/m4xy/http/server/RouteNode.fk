@@ -1,6 +1,3 @@
 import fckt.collections.Maps.Map
 
-// Where a path's segments lead in a Router: the routes whose paths end here, each for its own
-// method; where each fixed segment leads next, as links in /links; and where a parameter's leads,
-// as {slug} in /links/{slug}, one for every parameter at this place, whatever it's called.
 type RouteNode<@E>(routes: List<Route<@E>>, fixed: Map<String, RouteNode<@E>>, param: Option<RouteNode<@E>>)

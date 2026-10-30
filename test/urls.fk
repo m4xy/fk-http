@@ -2,7 +2,6 @@ import uk.m4xy.fktests.api.Test
 import uk.m4xy.fktests.api.Formats.*
 import uk.m4xy.http.*
 
-// A URL is read back as it's written, with the scheme's own port left out.
 @Test urlsAreReadBack() = {
   assertReadsBack(UrlText, Url(Http, "shop.example", 8080, "/items", Some("page=2")))
   assertReadsBack(UrlText, Url(Https, "shop.example", 443, "/"))
@@ -10,7 +9,6 @@ import uk.m4xy.http.*
   Method.values.forEach { assertReadsBack(MethodText, it) }
 }
 
-// What isn't said is as the scheme has it: its port, and the root.
 @Test aUrlSaysOnlyWhatIsntUsual() = {
   assertEquals(Ok(Url(Http, "shop.example", 80, "/", None)), UrlText.read("http://shop.example"))
   assertEquals(Ok(Url(Https, "shop.example", 443, "/", Some("q=1"))), UrlText.read("https://shop.example?q=1"))

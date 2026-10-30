@@ -1,7 +1,6 @@
 import fckt.io.Reader
 import fckt.text.Encodings.*
 
-// Runs body reading text, as if it were what a connection received.
 reading<A>(text: String, body: @Reader () -> A): A = {
   var rest = text
   Reader(

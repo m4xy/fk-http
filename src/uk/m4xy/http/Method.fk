@@ -1,3 +1,1 @@
-// What a request asks of what it names: Get reads it, Post sends it something, and so on. A
-// request writes it as its name in capitals, GET, as MethodText does.
 type Method { Get, Head, Post, Put, Patch, Delete, Options }

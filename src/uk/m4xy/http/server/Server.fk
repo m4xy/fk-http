@@ -11,15 +11,7 @@ import fckt.io.Polling
 import fckt.time.Clock
 import fckt.time.Duration
 
-// Serving routes: over the network, each connection a task of its own, or one connection, or to
-// requests a program sends itself.
 module Server {
-  // Serves routes on port until the program ends. Each connection is a task, which waits for what
-  // it receives and sends as PolledSockets does, so while one waits for a slow client the others
-  // are answered; the routes take turns, as tasks do, so none sees another half way through. A
-  // connection that receives or sends nothing for timeout is closed. The tasks are run as executor
-  // runs them. Routes that can't be served together, as two that match the same requests, fail
-  // before anything is served, saying why.
   @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = {
     router = when (Routers.of(routes)) {
       Ok(r) -> r
@@ -35,27 +27,21 @@ module Server {
     }
   }
 
-  // Accepts the next connection to listener, and answers it, waiting for it as Network does.
   @Network handleNext<@E>(listener: Listener, routes: List<Route<@E>>): Unit = when (accept(listener)) {
     Error(_) -> Unit
     Ok(connection) -> answer(connection, request -> Routes.respond(routes, request))
   }
 
-  // Answers the connection's request, and closes it: a request that isn't HTTP is answered 400.
   @Network private answer<@E>(connection: Connection, respond: @E (Request) -> Response): Unit = {
     response = when (attempt { Connections.reading(connection) { Wire.readRequest() } }) {
       Ok(Some(request)) -> Some(respond(request))
       Ok(None) -> None
       Error(reason) -> Some(Messages.text(badRequest, reason))
     }
-    // A client that's gone before it's answered has nothing to be told.
     response.forEach { r -> when (Network.send(connection, Wire.responseBytes(r))) { _ -> Unit } }
     close(connection)
   }
 
-  // Runs body with the requests it sends answered by routes, as a server of them would, without
-  // the network: to test a client and server together. It's @Network only as anything that does
-  // @Http is.
   @Network answering<@E, A>(routes: List<Route<@E>>, body: @Http () -> A): A = {
     router = Routers.of(routes)
     Http(send = request -> Ok(when (router) {
@@ -64,7 +50,6 @@ module Server {
     })) { body() }
   }
 
-  // Accepts connections for ever, each answered by a task of its own.
   @Network @Concurrent<@Polling @Clock @E> @Polling private forever<@E>(listener: Listener, router: Router<@E>, timeout: Duration): Nothing = {
     when (accept(listener)) {
       Ok(connection) -> {

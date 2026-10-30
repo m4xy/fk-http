@@ -1,6 +1,5 @@
 import fckt.text.Format
 
-// A URL as text: scheme://host[:port][path][?query], with no port when it's the scheme's own.
 module UrlText : Format {
   type T = Url
 
@@ -30,16 +29,13 @@ module UrlText : Format {
     }
   }
 
-  // The port a scheme's URLs are at unless they say: 80 for http, 443 for https.
   defaultPort(scheme: Scheme): Int = when (scheme) {
     Http -> 80
     Https -> 443
   }
 
-  // What a request asks for at the URL's host: its path, and its query.
   target(url: Url): String = url.path + url.query.map { "?$it" }.getOrElse("")
 
-  // Where the first of separators is in text, or its end.
   private firstOf(text: String, separators: List<String>): Int =
     separators.map { text.indexOf(it) }.filter { it >= 0 }.fold(text.length) { a, b -> if (b < a) b else a }
 }

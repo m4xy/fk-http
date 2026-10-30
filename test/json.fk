@@ -12,7 +12,6 @@ import uk.m4xy.http.client.Client
 import uk.m4xy.http.server.*
 import uk.m4xy.http.json.JsonBodies.*
 
-// An item, with its serializer as fk-serialization's processor writes one.
 type Item(name: String, price: Int)
 
 module ItemSerializer : Serializer {
@@ -39,7 +38,6 @@ catalogue: List<Route> = [
   Route(Post, "/items", call -> receiving(call, ItemSerializer) { item -> json(created, ItemSerializer, item.copy(price = item.price + 1)) }),
 ]
 
-// Values go both ways as JSON, which each side says it's sending.
 @Test @Fail @Network valuesAreSentAsJson() = Server.answering(catalogue) {
   got = Client.get("http://shop.example/items/3")
   assertEquals(Some("application/json"), got.header("Content-Type"))
@@ -50,7 +48,6 @@ catalogue: List<Route> = [
   assertEquals(Item("desk", 100), made.json(ItemSerializer))
 }
 
-// A request that sends what isn't what the route reads is the client's mistake, 400, saying why.
 @Test @Fail @Network whatIsntTheValueIsABadRequest() = Server.answering(catalogue) {
   wrong = Client.post("http://shop.example/items", "{\"name\":\"desk\"}".encodeToBytes(), "application/json")
   assertEquals(badRequest, wrong.status)
@@ -58,7 +55,6 @@ catalogue: List<Route> = [
   assertEquals(badRequest, Client.post("http://shop.example/items", "not json".encodeToBytes(), "application/json").status)
 }
 
-// A response that isn't the value asked for fails, saying why.
 @Test @Fail @Network aResponseThatIsntTheValueFails() = Server.answering([Route(Get, "/", call -> text(ok, "[]"))]) {
   assertEquals(
     Error("the response from the server isn't what was asked for: expected Item, an object, not an array"),

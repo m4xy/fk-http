@@ -1,3 +1,1 @@
-// Where something is, and how it's reached: http://shop.example:8080/items?page=2. UrlText reads
-// one from text.
 type Url(scheme: Scheme, host: String, port: Int, path: String = "/", query: Option<String> = None)
