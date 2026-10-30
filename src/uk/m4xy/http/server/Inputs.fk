@@ -10,7 +10,10 @@ module Inputs : Applicative {
 
   pure<A>(x: A): Input<A> = Input([], _ -> Valid(x))
 
-  map<A, B>(m: Input<A>, f: (A) -> B): Input<B> = Input(m.params, call -> Validated.map(m.read(call), f), m.parts)
+  map<A, B>(
+    m: Input<A>,
+    f: (A) -> B,
+  ): Input<B> = Input(m.params, call -> Validated.map(m.read(call), f), m.parts)
 
   product<A, B>(ma: Input<A>, mb: Input<B>): Input<(A, B)> =
     Input(
@@ -26,13 +29,28 @@ module Inputs : Applicative {
     None -> Invalid(["the path has no $name"])
   }, [PathPart(name)])
 
-  query(name: String): Input<Option<String>> = Input([], call -> Valid(queryOf(call.request.url.query.getOrElse("")).find { key, _ -> key == name }.map { _, value -> value }), [QueryPart(name)])
+  query(
+    name: String,
+  ): Input<Option<String>> = Input(
+    [],
+    call -> Valid(
+      queryOf(
+        call.request.url.query.getOrElse(""),
+      ).find { key, _ -> key == name }.map { _, value -> value },
+    ),
+    [QueryPart(name)],
+  )
 
-  header(name: String): Input<Option<String>> = Input([], call -> Valid(call.request.header(name)), [HeaderPart(name)])
+  header(
+    name: String,
+  ): Input<Option<String>> = Input([], call -> Valid(call.request.header(name)), [HeaderPart(name)])
 
   bodyText: Input<String> = Input([], call -> Valid(call.request.text), [TextBodyPart])
 
-  Input<String>.as<B>(what: String, parse: (String) -> Option<B>): Input<B> = Input(this.params, call -> when (this.read(call)) {
+  Input<String>.as<B>(
+    what: String,
+    parse: (String) -> Option<B>,
+  ): Input<B> = Input(this.params, call -> when (this.read(call)) {
     Valid(text) -> when (parse(text)) {
       Some(value) -> Valid(value)
       None -> Invalid(["'$text' isn't $what"])
@@ -40,11 +58,15 @@ module Inputs : Applicative {
     Invalid(why) -> Invalid(why)
   }, this.parts)
 
-  private queryOf(query: String): List<(String, String)> = query.split("&").filter { it.isNotEmpty() }.map { pair ->
+  private queryOf(
+    query: String,
+  ): List<(String, String)> = query.split("&").filter { it.isNotEmpty() }.map { pair ->
     (decoded(pair.substringBefore("=")), if (pair.contains("=")) decoded(pair.substringAfter("=")) else "")
   }
 
-  private decoded(text: String): String = bytesOf(unescaped(text.encodeToBytes().toList())).decodeUtf8().getOrElse(text)
+  private decoded(
+    text: String,
+  ): String = bytesOf(unescaped(text.encodeToBytes().toList())).decodeUtf8().getOrElse(text)
 
   private unescaped(bytes: List<Byte>): List<Byte> = when (bytes) {
     [] -> []

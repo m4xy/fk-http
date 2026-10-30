@@ -42,7 +42,9 @@ items = Url(Http, "shop.example", 8080, "/items", Some("page=2"))
   received = reading(sent) { Wire.readResponse(Get) }
   assertEquals(notFound, received.status)
   assertEquals("gone", received.text)
-  chunked = reading("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n6;note\r\npedia \r\n0\r\n\r\n") { Wire.readResponse(Get) }
+  chunked = reading(
+    "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n6;note\r\npedia \r\n0\r\n\r\n",
+  ) { Wire.readResponse(Get) }
   assertEquals("Wikipedia ", chunked.text)
   assertEquals(
     "to the end",

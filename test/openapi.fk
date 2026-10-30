@@ -12,8 +12,14 @@ import uk.m4xy.http.openapi.OpenApi
 import uk.m4xy.serialization.json.JsonText
 
 documented: List<Route> = [
-  get("/items/{id}", param("id")) { id -> json(ok, ItemSerializer, Item(id, 1)) }.answeringJson(ok, ItemSerializer).summarised("An item"),
-  post("/items", body(ItemSerializer)) { item -> json(created, ItemSerializer, item) }.answeringJson(created, ItemSerializer),
+  get(
+    "/items/{id}",
+    param("id"),
+  ) { id -> json(ok, ItemSerializer, Item(id, 1)) }.answeringJson(ok, ItemSerializer).summarised("An item"),
+  post(
+    "/items",
+    body(ItemSerializer),
+  ) { item -> json(created, ItemSerializer, item) }.answeringJson(created, ItemSerializer),
   delete("/items/{id}", param("id")) { _ -> Response(noContent) }.answering(noContent),
   get("/search", query("q")) { q -> text(ok, q.getOrElse("")) },
 ]

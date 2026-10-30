@@ -73,10 +73,15 @@ module Wire {
   }
 
   private head(start: String, headers: List<Header>): Bytes =
-    ([start] + headers.map { "${it.name}: ${it.value}" } + ["", ""]).joinToString("\r\n").encodeToBytes()
+    ([start] + headers.map { "${it.name}: ${it.value}" } + ["", ""]).joinToString(
+      "\r\n",
+    ).encodeToBytes()
 
   private framed(headers: List<Header>, body: Bytes, mayHaveBody: Boolean): List<Header> = {
-    sized = if (body.size > 0 || mayHaveBody) headers.with("Content-Length", "${body.size}") else headers
+    sized = if (body.size > 0 || mayHaveBody) headers.with(
+      "Content-Length",
+      "${body.size}",
+    ) else headers
     sized.filter { it.name.lowercase() != "transfer-encoding" }.with("Connection", "close")
   }
 
@@ -86,7 +91,9 @@ module Wire {
       line = l.removeSuffix("\r")
       if (line.isEmpty()) []
       else {
-        if (!line.contains(":")) fail("a header is a name, a colon and its value, as Content-Type: text/plain, not $line")
+        if (!line.contains(":")) fail(
+          "a header is a name, a colon and its value, as Content-Type: text/plain, not $line",
+        )
         [Header(line.substringBefore(":").trim(), line.substringAfter(":").trim()), *readHeaders()]
       }
     }
@@ -123,7 +130,9 @@ module Wire {
 
   @Reader @Fail private exactly(count: Int): Bytes = {
     bytes = nextBytes(count)
-    if (bytes.size < count) fail("the connection ended after ${bytes.size} of the body's $count bytes")
+    if (bytes.size < count) fail(
+      "the connection ended after ${bytes.size} of the body's $count bytes",
+    )
     bytes
   }
 }

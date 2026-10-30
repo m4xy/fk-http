@@ -33,7 +33,10 @@ module ItemSerializer : Serializer {
     leaveRecord()
     made
   }
-  describe(): Shape = RecordShape("shop.Item", [ShapeField("name", TextShape, true), ShapeField("price", IntegerShape, true)])
+  describe(): Shape = RecordShape(
+    "shop.Item",
+    [ShapeField("name", TextShape, true), ShapeField("price", IntegerShape, true)],
+  )
 }
 
 catalogue: List<Route> = [
@@ -45,7 +48,10 @@ catalogue: List<Route> = [
   Route(
     Post,
     "/items",
-    call -> receiving(call, ItemSerializer) { item -> json(created, ItemSerializer, item.copy(price = item.price + 1)) },
+    call -> receiving(
+      call,
+      ItemSerializer,
+    ) { item -> json(created, ItemSerializer, item.copy(price = item.price + 1)) },
   ),
 ]
 
@@ -73,11 +79,15 @@ catalogue: List<Route> = [
   )
 }
 
-@Test @Fail @Network aResponseThatIsntTheValueFails() = Server.answering([Route(Get, "/", call -> text(ok, "[]"))]) {
+@Test @Fail @Network aResponseThatIsntTheValueFails() = Server.answering(
+  [Route(Get, "/", call -> text(ok, "[]"))],
+) {
   assertEquals(
     Error(
       "the response from the server isn't what was asked for: expected Item, an object, not an array",
     ),
-    Fail(fail = (reason, _) -> Error(reason)) { Ok(Client.get("http://shop.example/").json(ItemSerializer)) },
+    Fail(
+      fail = (reason, _) -> Error(reason),
+    ) { Ok(Client.get("http://shop.example/").json(ItemSerializer)) },
   )
 }

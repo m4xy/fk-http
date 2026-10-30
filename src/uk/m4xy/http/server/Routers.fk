@@ -28,7 +28,9 @@ module Routers {
       None if ends.isEmpty() -> text(notFound, "nothing is at ${request.url.path}")
       None -> {
         allowed = ends.flatMap { it.routes }.map { MethodText.of(it.method) }.distinct().joinToString(", ")
-        text(methodNotAllowed, "${request.url.path} takes $allowed").copy(headers = [Header("Allow", allowed)])
+        text(methodNotAllowed, "${request.url.path} takes $allowed").copy(
+          headers = [Header("Allow", allowed)],
+        )
       }
     }
   }
@@ -42,10 +44,21 @@ module Routers {
 
   private empty<@E>(): RouteNode<@E> = RouteNode([], emptyMap(), None)
 
-  private added<@E>(node: RouteNode<@E>, path: List<String>, route: Route<@E>): RouteNode<@E> = when (path) {
+  private added<@E>(
+    node: RouteNode<@E>,
+    path: List<String>,
+    route: Route<@E>,
+  ): RouteNode<@E> = when (path) {
     [] -> node.copy(routes = node.routes + [route])
-    [segment, *rest] if isParam(segment) -> node.copy(param = Some(added(node.param.getOrElse(empty()), rest, route)))
-    [segment, *rest] -> node.copy(fixed = node.fixed.put(segment, added(node.fixed.get(segment).getOrElse(empty()), rest, route)))
+    [segment, *rest] if isParam(segment) -> node.copy(
+      param = Some(added(node.param.getOrElse(empty()), rest, route)),
+    )
+    [segment, *rest] -> node.copy(
+      fixed = node.fixed.put(
+        segment,
+        added(node.fixed.get(segment).getOrElse(empty()), rest, route),
+      ),
+    )
   }
 
   private clashes<@E>(node: RouteNode<@E>): List<String> = {
@@ -64,8 +77,16 @@ module Routers {
         (if (segment.isEmpty()) [] else node.param.map { endsOf(it, rest) }.getOrElse([]))
   }
 
-  private paramsOf(pattern: List<String>, path: List<String>, params: Map<String, String>): Map<String, String> = when (pattern, path) {
-    ([p, *ps], [s, *ss]) -> paramsOf(ps, ss, if (isParam(p)) params.put(p.drop(1).dropLast(1), s) else params)
+  private paramsOf(
+    pattern: List<String>,
+    path: List<String>,
+    params: Map<String, String>,
+  ): Map<String, String> = when (pattern, path) {
+    ([p, *ps], [s, *ss]) -> paramsOf(
+      ps,
+      ss,
+      if (isParam(p)) params.put(p.drop(1).dropLast(1), s) else params,
+    )
     _ -> params
   }
 }

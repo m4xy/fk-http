@@ -24,14 +24,20 @@ module JsonBodies {
       Json.encode(serializer, value).encodeToBytes(),
     )
 
-  @Fail Response.json(serializer: Serializer): serializer.T = when (Json.decode(serializer, this.text)) {
+  @Fail Response.json(
+    serializer: Serializer,
+  ): serializer.T = when (Json.decode(serializer, this.text)) {
     Ok(value) -> value
     Error(reason) -> fail("the response from the server isn't what was asked for: $reason")
   }
 
-  Request.json(serializer: Serializer): Result<serializer.T, String> = Json.decode(serializer, this.text)
+  Request.json(
+    serializer: Serializer,
+  ): Result<serializer.T, String> = Json.decode(serializer, this.text)
 
-  body(serializer: Serializer): Input<serializer.T> = Input([], call -> when (call.request.json(serializer)) {
+  body(
+    serializer: Serializer,
+  ): Input<serializer.T> = Input([], call -> when (call.request.json(serializer)) {
     Ok(value) -> Valid(value)
     Error(reason) -> Invalid([reason])
   }, [JsonBodyPart(serializer.describe())])
@@ -39,7 +45,11 @@ module JsonBodies {
   Route<@E>.answeringJson<@E>(status: Status, serializer: Serializer): Route<@E> =
     this.copy(answers = this.answers + [RouteAnswer(status, Some(serializer.describe()))])
 
-  receiving<@E>(call: Call, serializer: Serializer, respond: @E (serializer.T) -> Response): Response = when (call.request.json(serializer)) {
+  receiving<@E>(
+    call: Call,
+    serializer: Serializer,
+    respond: @E (serializer.T) -> Response,
+  ): Response = when (call.request.json(serializer)) {
     Ok(value) -> respond(value)
     Error(reason) -> text(badRequest, reason)
   }

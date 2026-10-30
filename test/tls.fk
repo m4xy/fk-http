@@ -27,4 +27,6 @@ import uk.m4xy.http.net.Network
   )
 }
 
-@Network @Http private statusOf(host: String): Result<Status, String> = Http.send(Request(Get, Url(Https, host, 443))).map { it.status }
+@Network @Http private statusOf(
+  host: String,
+): Result<Status, String> = Http.send(Request(Get, Url(Https, host, 443))).map { it.status }

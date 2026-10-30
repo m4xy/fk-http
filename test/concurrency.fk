@@ -55,7 +55,10 @@ import fckt.text.Encodings.*
   Error(reason) -> fail(reason)
 }
 
-@Network connected(port: Int, tries: Int): Option<Connection> = when (connect("localhost", port, Plain)) {
+@Network connected(
+  port: Int,
+  tries: Int,
+): Option<Connection> = when (connect("localhost", port, Plain)) {
   Ok(connection) -> Some(connection)
   Error(_) -> if (tries > 0) {
     pauseFor(Unit)

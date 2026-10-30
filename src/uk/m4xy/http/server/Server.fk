@@ -12,7 +12,12 @@ import fckt.time.Clock
 import fckt.time.Duration
 
 module Server {
-  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = {
+  @Fail @Clock serve<@E>(
+    port: Int,
+    routes: List<Route<@E>>,
+    timeout: Duration = Duration(30000),
+    executor: Executor = InTurn,
+  ): Nothing = {
     router = when (Routers.of(routes)) {
       Ok(r) -> r
       Error(why) -> fail("can't serve the routes: $why")
@@ -27,7 +32,10 @@ module Server {
     }
   }
 
-  @Network handleNext<@E>(listener: Listener, routes: List<Route<@E>>): Unit = when (accept(listener)) {
+  @Network handleNext<@E>(
+    listener: Listener,
+    routes: List<Route<@E>>,
+  ): Unit = when (accept(listener)) {
     Error(_) -> Unit
     Ok(connection) -> answer(connection, request -> Routes.respond(routes, request))
   }
@@ -50,7 +58,11 @@ module Server {
     })) { body() }
   }
 
-  @Network @Concurrent<@Polling @Clock @E> @Polling private forever<@E>(listener: Listener, router: Router<@E>, timeout: Duration): Nothing = {
+  @Network @Concurrent<@Polling @Clock @E> @Polling private forever<@E>(
+    listener: Listener,
+    router: Router<@E>,
+    timeout: Duration,
+  ): Nothing = {
     when (accept(listener)) {
       Ok(connection) -> {
         launch { PolledSockets.running(timeout) { answer(connection, request -> Routers.respond(router, request)) } }

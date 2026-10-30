@@ -4,15 +4,42 @@ import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
 
 module Endpoints {
-  get<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Get, path, input, respond)
-  post<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Post, path, input, respond)
-  put<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Put, path, input, respond)
-  patch<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Patch, path, input, respond)
-  delete<A, @E>(path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = endpoint(Delete, path, input, respond)
+  get<A, @E>(
+    path: String,
+    input: Input<A>,
+    respond: @Fail @E (A) -> Response,
+  ): Route<@E> = endpoint(Get, path, input, respond)
+  post<A, @E>(
+    path: String,
+    input: Input<A>,
+    respond: @Fail @E (A) -> Response,
+  ): Route<@E> = endpoint(Post, path, input, respond)
+  put<A, @E>(
+    path: String,
+    input: Input<A>,
+    respond: @Fail @E (A) -> Response,
+  ): Route<@E> = endpoint(Put, path, input, respond)
+  patch<A, @E>(
+    path: String,
+    input: Input<A>,
+    respond: @Fail @E (A) -> Response,
+  ): Route<@E> = endpoint(Patch, path, input, respond)
+  delete<A, @E>(
+    path: String,
+    input: Input<A>,
+    respond: @Fail @E (A) -> Response,
+  ): Route<@E> = endpoint(Delete, path, input, respond)
 
-  endpoint<A, @E>(method: Method, path: String, input: Input<A>, respond: @Fail @E (A) -> Response): Route<@E> = {
+  endpoint<A, @E>(
+    method: Method,
+    path: String,
+    input: Input<A>,
+    respond: @Fail @E (A) -> Response,
+  ): Route<@E> = {
     missing = unknownParams(path, input)
-    if (missing.isNotEmpty()) error("${MethodText.of(method)} $path reads ${missing.map { "{$it}" }.joinToString(", ")}, which its path hasn't got")
+    if (missing.isNotEmpty()) error(
+      "${MethodText.of(method)} $path reads ${missing.map { "{$it}" }.joinToString(", ")}, which its path hasn't got",
+    )
     Route(method, path, call -> when (input.read(call)) {
       Valid(value) -> respond(value)
       Invalid(why) -> text(badRequest, why.joinToString("; "))

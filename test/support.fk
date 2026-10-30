@@ -17,4 +17,7 @@ reading<A>(text: String, body: @Reader () -> A): A = {
   ) { body() }
 }
 
-expectContains(text: String, part: String): Unit = if (!text.contains(part)) error("expected to find:\n$part\nin:\n$text")
+expectContains(
+  text: String,
+  part: String,
+): Unit = if (!text.contains(part)) error("expected to find:\n$part\nin:\n$text")

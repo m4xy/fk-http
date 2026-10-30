@@ -12,13 +12,18 @@ module Routes {
   mounted<@E>(prefix: String, routes: List<Route<@E>>): List<Route<@E>> =
     routes.map { it.copy(path = prefix.removeSuffix("/") + (if (it.path == "/") "" else it.path)) }
 
-  around<@E, @F>(routes: List<Route<@E>>, around: @Fail @F (@Fail @E () -> Response) -> Response): List<Route<@F>> =
+  around<@E, @F>(
+    routes: List<Route<@E>>,
+    around: @Fail @F (@Fail @E () -> Response) -> Response,
+  ): List<Route<@F>> =
     routes.map { route ->
       respond = route.respond
       Route(route.method, route.path, call -> around { respond(call) })
     }
 
-  Route<@E>.answering<@E>(status: Status): Route<@E> = this.copy(answers = this.answers + [RouteAnswer(status, None)])
+  Route<@E>.answering<@E>(
+    status: Status,
+  ): Route<@E> = this.copy(answers = this.answers + [RouteAnswer(status, None)])
 
   Route<@E>.summarised<@E>(summary: String): Route<@E> = this.copy(summary = Some(summary))
 }

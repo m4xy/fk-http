@@ -5,7 +5,11 @@ import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
 import uk.m4xy.http.server.*
 
-@Fail answered(routes: List<Route>, method: Method, path: String): String = when (Routers.of(routes)) {
+@Fail answered(
+  routes: List<Route>,
+  method: Method,
+  path: String,
+): String = when (Routers.of(routes)) {
   Ok(router) -> Routers.respond(router, Request(method, Url(Http, "shop.example", 80, path))).text
   Error(why) -> fail(why)
 }
@@ -41,7 +45,10 @@ saying(what: String): (Call) -> Response = _ -> text(ok, what)
 
 @Test @Fail routesAreMounted() = {
   items = [Route(Get, "/", saying("every item")), Route(Get, "/{id}", saying("an item"))]
-  routes = Routes.mounted("/items", items) + Routes.mounted("/api/users/", [Route(Get, "/{id}", saying("a user"))])
+  routes = Routes.mounted("/items", items) + Routes.mounted(
+    "/api/users/",
+    [Route(Get, "/{id}", saying("a user"))],
+  )
   assertEquals(["/items", "/items/{id}", "/api/users/{id}"], routes.map { it.path })
   assertEquals("every item", answered(routes, Get, "/items"))
   assertEquals("a user", answered(routes, Get, "/api/users/7"))

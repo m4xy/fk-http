@@ -1,3 +1,7 @@
 import fckt.monads.Validation
 
-type Input<A>(params: List<String>, read: (Call) -> Validation<A, String>, parts: List<InputPart> = [])
+type Input<A>(
+  params: List<String>,
+  read: (Call) -> Validation<A, String>,
+  parts: List<InputPart> = [],
+)

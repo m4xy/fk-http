@@ -7,10 +7,16 @@ import fckt.values.Mutable
 module Connections {
   @Network @Fail reading<A>(connection: Connection, body: @Reader () -> A): A = {
     kept = Mutable(Kept("".encodeToBytes(), false))
-    Reader(nextLine = () -> line(connection, kept), nextBytes = count -> bytes(connection, kept, count)) { body() }
+    Reader(
+      nextLine = () -> line(connection, kept),
+      nextBytes = count -> bytes(connection, kept, count),
+    ) { body() }
   }
 
-  @Network @Fail @Mutating private line(connection: Connection, kept: Mutable<Kept>): Option<String> = {
+  @Network @Fail @Mutating private line(
+    connection: Connection,
+    kept: Mutable<Kept>,
+  ): Option<String> = {
     k = kept.value
     at = indexOfNewline(k.bytes)
     if (at >= 0) {
@@ -25,7 +31,11 @@ module Connections {
     }
   }
 
-  @Network @Fail @Mutating private bytes(connection: Connection, kept: Mutable<Kept>, count: Int): Bytes = {
+  @Network @Fail @Mutating private bytes(
+    connection: Connection,
+    kept: Mutable<Kept>,
+    count: Int,
+  ): Bytes = {
     k = kept.value
     if (count >= 0 && k.bytes.size >= count) {
       kept.value = k.copy(bytes = slice(k.bytes, count, k.bytes.size - count))
@@ -39,9 +49,14 @@ module Connections {
     }
   }
 
-  @Network @Fail @Mutating private more(connection: Connection, kept: Mutable<Kept>): Unit = when (receive(connection)) {
+  @Network @Fail @Mutating private more(
+    connection: Connection,
+    kept: Mutable<Kept>,
+  ): Unit = when (receive(connection)) {
     Ok(received) -> {
-      kept.value = if (received.size == 0) kept.value.copy(ended = true) else kept.value.copy(bytes = kept.value.bytes + received)
+      kept.value = if (received.size == 0) kept.value.copy(ended = true) else kept.value.copy(
+        bytes = kept.value.bytes + received,
+      )
     }
     Error(reason) -> fail(reason)
   }

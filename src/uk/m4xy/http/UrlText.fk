@@ -19,9 +19,15 @@ module UrlText : Format {
         path = after.substringBefore("?")
         query = if (after.contains("?")) Some(after.substringAfter("?")) else None
         host = if (authority.contains(":")) authority.substringBeforeLast(":") else authority
-        port = if (authority.contains(":")) authority.substringAfterLast(":").toIntOrNone() else Some(defaultPort(s))
+        port = if (authority.contains(":")) authority.substringAfterLast(
+          ":",
+        ).toIntOrNone() else Some(
+          defaultPort(s),
+        )
         when (port) {
-          _ if host.isEmpty() -> Error("a URL names a host, as http://shop.example/items, not $text")
+          _ if host.isEmpty() -> Error(
+            "a URL names a host, as http://shop.example/items, not $text",
+          )
           Some(p) -> Ok(Url(s, host, p, if (path.isEmpty()) "/" else path, query))
           None -> Error("a URL's port is a number, not ${authority.substringAfterLast(":")}")
         }

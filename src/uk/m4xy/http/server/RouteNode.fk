@@ -1,3 +1,7 @@
 import fckt.collections.Maps.Map
 
-type RouteNode<@E>(routes: List<Route<@E>>, fixed: Map<String, RouteNode<@E>>, param: Option<RouteNode<@E>>)
+type RouteNode<@E>(
+  routes: List<Route<@E>>,
+  fixed: Map<String, RouteNode<@E>>,
+  param: Option<RouteNode<@E>>,
+)

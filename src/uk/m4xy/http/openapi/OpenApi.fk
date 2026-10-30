@@ -29,7 +29,12 @@ module OpenApi {
     }))])),
   ])
 
-  documenting<@E>(path: String, title: String, version: String, routes: List<Route<@E>>): Route<@E> = {
+  documenting<@E>(
+    path: String,
+    title: String,
+    version: String,
+    routes: List<Route<@E>>,
+  ): Route<@E> = {
     text = JsonText.of(document(title, version, routes))
     Route(
       Get,
@@ -78,7 +83,14 @@ module OpenApi {
     )
 
   private responses(answers: List<RouteAnswer>): JsonValue = when (answers) {
-    [] -> JsonObject([JsonField("default", JsonObject([JsonField("description", JsonString("what the route answers"))]))])
+    [] -> JsonObject(
+      [
+        JsonField(
+          "default",
+          JsonObject([JsonField("description", JsonString("what the route answers"))]),
+        ),
+      ],
+    )
     else -> JsonObject(answers.map { a ->
       JsonField("${a.status.code}", JsonObject([JsonField("description", JsonString(a.status.reason))] +
         a.shape.map { s -> [content("application/json", schema(named(s)))] }.getOrElse([])))
@@ -97,11 +109,20 @@ module OpenApi {
         JsonField("maxLength", JsonNumber("1")),
       ],
     )
-    ListShape(item) -> JsonObject([JsonField("type", JsonString("array")), JsonField("items", schema(item))])
+    ListShape(item) -> JsonObject(
+      [JsonField("type", JsonString("array")), JsonField("items", schema(item))],
+    )
     OptionShape(value) -> nullable(schema(value))
-    MapShape(value) -> JsonObject([JsonField("type", JsonString("object")), JsonField("additionalProperties", schema(value))])
+    MapShape(value) -> JsonObject(
+      [JsonField("type", JsonString("object")), JsonField("additionalProperties", schema(value))],
+    )
     RecordShape(_, fields) -> objectOf(fields, [])
-    EnumerationShape(_, values) -> JsonObject([JsonField("type", JsonString("string")), JsonField("enum", JsonArray(values.map { JsonString(it) }))])
+    EnumerationShape(_, values) -> JsonObject(
+      [
+        JsonField("type", JsonString("string")),
+        JsonField("enum", JsonArray(values.map { JsonString(it) })),
+      ],
+    )
     CasesShape(_, cases) -> JsonObject([
       JsonField("oneOf", JsonArray(cases.map { c ->
         objectOf(
@@ -121,14 +142,18 @@ module OpenApi {
       })),
       JsonField("discriminator", JsonObject([JsonField("propertyName", JsonString("type"))])),
     ])
-    ReferenceShape(name, _) -> JsonObject([JsonField("\$ref", JsonString("#/components/schemas/$name"))])
+    ReferenceShape(name, _) -> JsonObject(
+      [JsonField("\$ref", JsonString("#/components/schemas/$name"))],
+    )
     UnknownShape -> JsonObject([])
   }
 
   private typed(name: String): JsonValue = JsonObject([JsonField("type", JsonString(name))])
 
   private nullable(schema: JsonValue): JsonValue = when (schema) {
-    JsonObject(fields) if fields.none { it.name == "\$ref" } -> JsonObject(fields + [JsonField("nullable", JsonBoolean(true))])
+    JsonObject(
+      fields,
+    ) if fields.none { it.name == "\$ref" } -> JsonObject(fields + [JsonField("nullable", JsonBoolean(true))])
     other -> JsonObject(
       [JsonField("allOf", JsonArray([other])), JsonField("nullable", JsonBoolean(true))],
     )
@@ -162,7 +187,10 @@ module OpenApi {
     other -> other
   }
 
-  private referenced(toVisit: List<SerialShape>, found: List<(String, SerialShape)>): List<(String, SerialShape)> = when (toVisit) {
+  private referenced(
+    toVisit: List<SerialShape>,
+    found: List<(String, SerialShape)>,
+  ): List<(String, SerialShape)> = when (toVisit) {
     [] -> found
     [shape, *rest] -> when (shape) {
       ReferenceShape(name, described) ->

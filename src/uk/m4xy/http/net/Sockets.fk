@@ -2,7 +2,11 @@ import fckt.text.Bytes
 import fckt.io.Descriptor
 
 module Sockets : Network {
-  connect(host: String, port: Int, security: Security): Result<Connection, String> = when (tcpConnect(host, port)) {
+  connect(
+    host: String,
+    port: Int,
+    security: Security,
+  ): Result<Connection, String> = when (tcpConnect(host, port)) {
     Ok(socket) -> when (security) {
       Plain -> Ok(plainOver(socket))
       Tls -> tlsOver(socket, host)
@@ -32,8 +36,13 @@ module Sockets : Network {
     "(fun l -> match Unix.getsockname l with Unix.ADDR_INET (_, p) -> p | _ -> 0) listener"
   private external tcpAccept(listener: Listener): Result<Descriptor, String> =
     "(fun l -> let rec go () = match Unix.accept l with (s, _) -> Ok s | exception Unix.Unix_error (Unix.EINTR, _, _) -> go () | exception Unix.Unix_error (e, _, _) -> Error (Unix.error_message e) in go ()) listener"
-  private external received(connection: Connection): Result<Bytes, String> = "(fun (_, _, receive, _, _) -> receive ()) connection"
-  private external sent(connection: Connection, bytes: Bytes): Result<Unit, String> = "(fun (_, _, _, send, _) b -> send b) connection bytes"
+  private external received(
+    connection: Connection,
+  ): Result<Bytes, String> = "(fun (_, _, receive, _, _) -> receive ()) connection"
+  private external sent(
+    connection: Connection,
+    bytes: Bytes,
+  ): Result<Unit, String> = "(fun (_, _, _, send, _) b -> send b) connection bytes"
   private external closed(
     connection: Connection,
   ): Unit = "(fun (_, _, _, _, close) -> close ()) connection"
