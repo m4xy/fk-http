@@ -20,11 +20,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: m4xy/fckt
+          ref: boot-seed
           path: fckt
-      - uses: actions/checkout@v5
-        with:
-          repository: m4xy/kastor
-          path: kastor
       - uses: actions/checkout@v5
         with:
           repository: m4xy/kiln
@@ -37,11 +34,6 @@ jobs:
         with:
           repository: m4xy/fk-serialization
           path: fk-serialization
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: 21
-      - uses: gradle/actions/setup-gradle@v5
       - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: 5
@@ -49,7 +41,7 @@ jobs:
       - run: opam install -y ssl ocamlfind
       - name: Build fckt
         working-directory: fckt
-        run: ./gradlew :installDist && echo "$PWD/build/install/fckt/bin" >> "$GITHUB_PATH"
+        run: opam exec -- ./bootstrap.sh && echo "$PWD/build/boot/bin" >> "$GITHUB_PATH"
       - name: Bootstrap kiln
         working-directory: kiln
         run: opam exec -- ./bootstrap.sh && echo "$HOME/.kiln/bin" >> "$GITHUB_PATH"
