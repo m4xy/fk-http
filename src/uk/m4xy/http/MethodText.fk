@@ -5,6 +5,8 @@ module MethodText : Format {
   of(value: Method): String = value.name.uppercase()
   read(text: String): Result<Method, String> = when (Method.values.find { of(it) == text }) {
     Some(method) -> Ok(method)
-    None -> Error("a method is one of ${Method.values.map { of(it) }.joinToString(", ")}, not $text")
+    None -> Error(
+      "a method is one of ${Method.values.map { of(it) }.joinToString(", ")}, not $text",
+    )
   }
 }

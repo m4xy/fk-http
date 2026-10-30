@@ -18,7 +18,11 @@ module JsonBodies {
   mediaType: String = "application/json"
 
   json(status: Status, serializer: Serializer, value: serializer.T): Response =
-    Response(status, [Header("Content-Type", mediaType)], Json.encode(serializer, value).encodeToBytes())
+    Response(
+      status,
+      [Header("Content-Type", mediaType)],
+      Json.encode(serializer, value).encodeToBytes(),
+    )
 
   @Fail Response.json(serializer: Serializer): serializer.T = when (Json.decode(serializer, this.text)) {
     Ok(value) -> value
@@ -44,5 +48,12 @@ module JsonBodies {
     Client.post(url, Json.encode(serializer, value).encodeToBytes(), mediaType)
 
   @Http @Fail putJson(url: String, serializer: Serializer, value: serializer.T): Response =
-    Client.send(Request(Put, Client.parsed(url), [Header("Content-Type", mediaType)], Json.encode(serializer, value).encodeToBytes()))
+    Client.send(
+      Request(
+        Put,
+        Client.parsed(url),
+        [Header("Content-Type", mediaType)],
+        Json.encode(serializer, value).encodeToBytes(),
+      ),
+    )
 }

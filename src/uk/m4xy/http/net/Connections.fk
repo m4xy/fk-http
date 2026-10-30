@@ -46,7 +46,9 @@ module Connections {
     Error(reason) -> fail(reason)
   }
 
-  private external indexOfNewline(bytes: Bytes): Int = "(fun b -> match String.index_opt b '\\n' with Some i -> i | None -> -1) bytes"
+  private external indexOfNewline(
+    bytes: Bytes,
+  ): Int = "(fun b -> match String.index_opt b '\\n' with Some i -> i | None -> -1) bytes"
   private external slice(bytes: Bytes, from: Int, count: Int): Bytes = "String.sub bytes from count"
 }
 

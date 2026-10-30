@@ -13,7 +13,11 @@ module Inputs : Applicative {
   map<A, B>(m: Input<A>, f: (A) -> B): Input<B> = Input(m.params, call -> Validated.map(m.read(call), f), m.parts)
 
   product<A, B>(ma: Input<A>, mb: Input<B>): Input<(A, B)> =
-    Input(ma.params + mb.params, call -> Validated.product(ma.read(call), mb.read(call)), ma.parts + mb.parts)
+    Input(
+      ma.params + mb.params,
+      call -> Validated.product(ma.read(call), mb.read(call)),
+      ma.parts + mb.parts,
+    )
 
   nothing: Input<Unit> = pure(Unit)
 

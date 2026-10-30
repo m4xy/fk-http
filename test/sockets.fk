@@ -17,7 +17,16 @@ import uk.m4xy.http.server.*
   port = portOf(listener)
   server = forked(Unit)
   if (server == 0) {
-    Server.handleNext(listener, [Route(Get, "/hello/{name}", call -> text(ok, "hello ${call.params.get("name").getOrElse("?")}"))])
+    Server.handleNext(
+      listener,
+      [
+        Route(
+          Get,
+          "/hello/{name}",
+          call -> text(ok, "hello ${call.params.get("name").getOrElse("?")}"),
+        ),
+      ],
+    )
     exitNow(0)
   }
   stop(listener)
@@ -30,9 +39,14 @@ import uk.m4xy.http.server.*
   assertEquals(ok, response.status)
   assertEquals("hello world", response.text)
   assertEquals(Some("text/plain; charset=utf-8"), response.header("Content-Type"))
-  assertEquals(Error("localhost:$port: Connection refused"), Http.send(Request(Get, Url(Http, "localhost", port))).map { it.status })
+  assertEquals(
+    Error("localhost:$port: Connection refused"),
+    Http.send(Request(Get, Url(Http, "localhost", port))).map { it.status },
+  )
 }
 
 private external forked(u: Unit): Int = "(fun _ -> Unix.fork ()) u"
-private external ended(pid: Int): Unit = "(fun p -> (try Unix.kill p Sys.sigterm with Unix.Unix_error _ -> ()); ignore (Unix.waitpid [] p)) pid"
+private external ended(
+  pid: Int,
+): Unit = "(fun p -> (try Unix.kill p Sys.sigterm with Unix.Unix_error _ -> ()); ignore (Unix.waitpid [] p)) pid"
 private external exitNow(code: Int): Nothing = "Unix._exit code"

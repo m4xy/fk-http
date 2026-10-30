@@ -11,13 +11,28 @@ import uk.m4xy.http.*
 
 @Test aUrlSaysOnlyWhatIsntUsual() = {
   assertEquals(Ok(Url(Http, "shop.example", 80, "/", None)), UrlText.read("http://shop.example"))
-  assertEquals(Ok(Url(Https, "shop.example", 443, "/", Some("q=1"))), UrlText.read("https://shop.example?q=1"))
-  assertEquals(Ok(Url(Http, "localhost", 8080, "/a/b", None)), UrlText.read("http://localhost:8080/a/b"))
+  assertEquals(
+    Ok(Url(Https, "shop.example", 443, "/", Some("q=1"))),
+    UrlText.read("https://shop.example?q=1"),
+  )
+  assertEquals(
+    Ok(Url(Http, "localhost", 8080, "/a/b", None)),
+    UrlText.read("http://localhost:8080/a/b"),
+  )
 }
 
 @Test whatIsntAUrlSaysSo() = {
-  assertEquals(Error("a URL starts http:// or https://, as http://shop.example/items, not ftp://x"), UrlText.read("ftp://x"))
-  assertEquals(Error("a URL names a host, as http://shop.example/items, not http:///items"), UrlText.read("http:///items"))
+  assertEquals(
+    Error("a URL starts http:// or https://, as http://shop.example/items, not ftp://x"),
+    UrlText.read("ftp://x"),
+  )
+  assertEquals(
+    Error("a URL names a host, as http://shop.example/items, not http:///items"),
+    UrlText.read("http:///items"),
+  )
   assertEquals(Error("a URL's port is a number, not web"), UrlText.read("http://shop:web/"))
-  assertEquals(Error("a method is one of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, not FETCH"), MethodText.read("FETCH"))
+  assertEquals(
+    Error("a method is one of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS, not FETCH"),
+    MethodText.read("FETCH"),
+  )
 }

@@ -1,7 +1,12 @@
 import uk.m4xy.kiln.fckt.*
 import uk.m4xy.fktests.kiln.*
 
-project = Project(name = "fk-http", group = "uk.m4xy", version = "0.1.0", dependencies = [library("uk.m4xy:fk-serialization:0.1.0")])
+project = Project(
+  name = "fk-http",
+  group = "uk.m4xy",
+  version = "0.1.0",
+  dependencies = [library("uk.m4xy:fk-serialization:0.1.0")],
+)
 
 module WithSsl : FcktConfiguration {
   layout(): FcktLayout = FcktLayout(ocamlPackages = ["ssl"])

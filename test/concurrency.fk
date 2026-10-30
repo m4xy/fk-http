@@ -39,7 +39,10 @@ import fckt.text.Encodings.*
   closed = quiet.map { c -> receive(c).map { it.decodeToString() } }
   quiet.forEach { close(it) }
   stopped(server)
-  assertEquals(Some(true), answered.map { r -> r.map { it.startsWith("HTTP/1.1 400 Bad Request") && it.endsWith("nothing was received for 0.2s") }.getOrElse(false) })
+  assertEquals(
+    Some(true),
+    answered.map { r -> r.map { it.startsWith("HTTP/1.1 400 Bad Request") && it.endsWith("nothing was received for 0.2s") }.getOrElse(false) },
+  )
   assertEquals(Some(Ok("")), closed)
 }
 
@@ -62,5 +65,7 @@ import fckt.text.Encodings.*
 
 private external pauseFor(u: Unit): Unit = "(fun _ -> Unix.sleepf 0.02) u"
 private external forkedServer(u: Unit): Int = "(fun _ -> Unix.fork ()) u"
-private external stopped(pid: Int): Unit = "(fun p -> (try Unix.kill p Sys.sigterm with Unix.Unix_error _ -> ()); ignore (Unix.waitpid [] p)) pid"
+private external stopped(
+  pid: Int,
+): Unit = "(fun p -> (try Unix.kill p Sys.sigterm with Unix.Unix_error _ -> ()); ignore (Unix.waitpid [] p)) pid"
 private external exitAt(code: Int): Nothing = "Unix._exit code"

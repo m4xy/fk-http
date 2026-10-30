@@ -10,9 +10,19 @@ import uk.m4xy.serialization.json.*
 module OpenApi {
   document<@E>(title: String, version: String, routes: List<Route<@E>>): JsonValue = JsonObject([
     JsonField("openapi", JsonString("3.0.3")),
-    JsonField("info", JsonObject([JsonField("title", JsonString(title)), JsonField("version", JsonString(version))])),
+    JsonField(
+      "info",
+      JsonObject(
+        [JsonField("title", JsonString(title)), JsonField("version", JsonString(version))],
+      ),
+    ),
     JsonField("paths", JsonObject(routes.map { it.path }.distinct().map { path ->
-      JsonField(path, JsonObject(routes.filter { it.path == path }.map { r -> JsonField(MethodText.of(r.method).lowercase(), operation(r)) }))
+      JsonField(
+        path,
+        JsonObject(
+          routes.filter { it.path == path }.map { r -> JsonField(MethodText.of(r.method).lowercase(), operation(r)) },
+        ),
+      )
     })),
     JsonField("components", JsonObject([JsonField("schemas", JsonObject(referenced(shapesIn(routes), []).map { name, shape ->
       JsonField(name, schema(shape))
@@ -21,7 +31,11 @@ module OpenApi {
 
   documenting<@E>(path: String, title: String, version: String, routes: List<Route<@E>>): Route<@E> = {
     text = JsonText.of(document(title, version, routes))
-    Route(Get, path, _ -> Response(ok, [Header("Content-Type", "application/json")], text.encodeToBytes()))
+    Route(
+      Get,
+      path,
+      _ -> Response(ok, [Header("Content-Type", "application/json")], text.encodeToBytes()),
+    )
   }
 
   private operation<@E>(r: Route<@E>): JsonValue = {
@@ -36,7 +50,9 @@ module OpenApi {
     body = r.reads.mapNotNull { part ->
       when (part) {
         JsonBodyPart(shape) -> Some(content("application/json", schema(named(shape))))
-        TextBodyPart -> Some(content("text/plain", JsonObject([JsonField("type", JsonString("string"))])))
+        TextBodyPart -> Some(
+          content("text/plain", JsonObject([JsonField("type", JsonString("string"))])),
+        )
         else -> None
       }
     }.firstOrNone()
@@ -56,7 +72,10 @@ module OpenApi {
   ])
 
   private content(mediaType: String, schema: JsonValue): JsonField =
-    JsonField("content", JsonObject([JsonField(mediaType, JsonObject([JsonField("schema", schema)]))]))
+    JsonField(
+      "content",
+      JsonObject([JsonField(mediaType, JsonObject([JsonField("schema", schema)]))]),
+    )
 
   private responses(answers: List<RouteAnswer>): JsonValue = when (answers) {
     [] -> JsonObject([JsonField("default", JsonObject([JsonField("description", JsonString("what the route answers"))]))])
@@ -71,7 +90,13 @@ module OpenApi {
     IntegerShape -> typed("integer")
     NumberShape -> typed("number")
     BooleanShape -> typed("boolean")
-    CharShape -> JsonObject([JsonField("type", JsonString("string")), JsonField("minLength", JsonNumber("1")), JsonField("maxLength", JsonNumber("1"))])
+    CharShape -> JsonObject(
+      [
+        JsonField("type", JsonString("string")),
+        JsonField("minLength", JsonNumber("1")),
+        JsonField("maxLength", JsonNumber("1")),
+      ],
+    )
     ListShape(item) -> JsonObject([JsonField("type", JsonString("array")), JsonField("items", schema(item))])
     OptionShape(value) -> nullable(schema(value))
     MapShape(value) -> JsonObject([JsonField("type", JsonString("object")), JsonField("additionalProperties", schema(value))])
@@ -79,7 +104,20 @@ module OpenApi {
     EnumerationShape(_, values) -> JsonObject([JsonField("type", JsonString("string")), JsonField("enum", JsonArray(values.map { JsonString(it) }))])
     CasesShape(_, cases) -> JsonObject([
       JsonField("oneOf", JsonArray(cases.map { c ->
-        objectOf(c.fields, [JsonField("type", JsonObject([JsonField("type", JsonString("string")), JsonField("enum", JsonArray([JsonString(c.name)]))]))])
+        objectOf(
+          c.fields,
+          [
+            JsonField(
+              "type",
+              JsonObject(
+                [
+                  JsonField("type", JsonString("string")),
+                  JsonField("enum", JsonArray([JsonString(c.name)])),
+                ],
+              ),
+            ),
+          ],
+        )
       })),
       JsonField("discriminator", JsonObject([JsonField("propertyName", JsonString("type"))])),
     ])
@@ -91,14 +129,19 @@ module OpenApi {
 
   private nullable(schema: JsonValue): JsonValue = when (schema) {
     JsonObject(fields) if fields.none { it.name == "\$ref" } -> JsonObject(fields + [JsonField("nullable", JsonBoolean(true))])
-    other -> JsonObject([JsonField("allOf", JsonArray([other])), JsonField("nullable", JsonBoolean(true))])
+    other -> JsonObject(
+      [JsonField("allOf", JsonArray([other])), JsonField("nullable", JsonBoolean(true))],
+    )
   }
 
   private objectOf(fields: List<ShapeField>, first: List<JsonField>): JsonValue = {
     required = first.map { it.name } + fields.filter { it.required }.map { it.name }
     JsonObject([
       JsonField("type", JsonString("object")),
-      JsonField("properties", JsonObject(first + fields.map { f -> JsonField(f.name, schema(f.shape)) })),
+      JsonField(
+        "properties",
+        JsonObject(first + fields.map { f -> JsonField(f.name, schema(f.shape)) }),
+      ),
     ] + (if (required.isEmpty()) [] else [JsonField("required", JsonArray(required.map { JsonString(it) }))]))
   }
 

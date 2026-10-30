@@ -10,13 +10,20 @@ module Wire {
   requestBytes(request: Request): Bytes = {
     url = request.url
     host = if (url.port == UrlText.defaultPort(url.scheme)) url.host else "${url.host}:${url.port}"
-    headers = framed(request.headers.with("Host", host), request.body, request.method != Get && request.method != Head)
+    headers = framed(
+      request.headers.with("Host", host),
+      request.body,
+      request.method != Get && request.method != Head,
+    )
     head("${MethodText.of(request.method)} ${UrlText.target(url)} HTTP/1.1", headers) + request.body
   }
 
   responseBytes(response: Response): Bytes = {
     status = response.status
-    head("HTTP/1.1 ${status.code} ${status.reason}", framed(response.headers, response.body, !status.isBodiless())) + response.body
+    head(
+      "HTTP/1.1 ${status.code} ${status.reason}",
+      framed(response.headers, response.body, !status.isBodiless()),
+    ) + response.body
   }
 
   @Reader @Fail readRequest(): Option<Request> = when (nextLine()) {
@@ -25,7 +32,9 @@ module Wire {
       line = first.removeSuffix("\r")
       (written, target) = when (line.split(" ")) {
         [m, t, version] if version.startsWith("HTTP/") -> (m, t)
-        _ -> fail("a request starts with its method, target and version, as GET /items HTTP/1.1, not $line")
+        _ -> fail(
+          "a request starts with its method, target and version, as GET /items HTTP/1.1, not $line",
+        )
       }
       method = when (MethodText.read(written)) {
         Ok(m) -> m
@@ -56,7 +65,11 @@ module Wire {
       None -> fail("a response starts with its version and status, as HTTP/1.1 200 OK, not $line")
     }
     headers = readHeaders()
-    Response(status, headers, if (method == Head || status.isBodiless()) "".encodeToBytes() else readBody(headers, true))
+    Response(
+      status,
+      headers,
+      if (method == Head || status.isBodiless()) "".encodeToBytes() else readBody(headers, true),
+    )
   }
 
   private head(start: String, headers: List<Header>): Bytes =

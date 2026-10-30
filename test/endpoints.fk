@@ -22,7 +22,13 @@ shelf: List<Route> = [
 ]
 
 @Fail asked(method: Method, target: String, body: String = ""): Response = {
-  url = Url(Http, "shop.example", 80, target.substringBefore("?"), if (target.contains("?")) Some(target.substringAfter("?")) else None)
+  url = Url(
+    Http,
+    "shop.example",
+    80,
+    target.substringBefore("?"),
+    if (target.contains("?")) Some(target.substringAfter("?")) else None,
+  )
   Routes.respond(shelf, Request(method, url, [], body.encodeToBytes()))
 }
 

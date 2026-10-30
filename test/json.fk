@@ -26,7 +26,10 @@ module ItemSerializer : Serializer {
   }
   @Decoder deserialize(): Item = {
     enterRecord("Item")
-    made = Item(required("Item", "name") { StringSerializer.deserialize() }, required("Item", "price") { IntSerializer.deserialize() })
+    made = Item(
+      required("Item", "name") { StringSerializer.deserialize() },
+      required("Item", "price") { IntSerializer.deserialize() },
+    )
     leaveRecord()
     made
   }
@@ -34,8 +37,16 @@ module ItemSerializer : Serializer {
 }
 
 catalogue: List<Route> = [
-  Route(Get, "/items/{id}", call -> json(ok, ItemSerializer, Item("lamp ${call.params.get("id").getOrElse("?")}", 30))),
-  Route(Post, "/items", call -> receiving(call, ItemSerializer) { item -> json(created, ItemSerializer, item.copy(price = item.price + 1)) }),
+  Route(
+    Get,
+    "/items/{id}",
+    call -> json(ok, ItemSerializer, Item("lamp ${call.params.get("id").getOrElse("?")}", 30)),
+  ),
+  Route(
+    Post,
+    "/items",
+    call -> receiving(call, ItemSerializer) { item -> json(created, ItemSerializer, item.copy(price = item.price + 1)) },
+  ),
 ]
 
 @Test @Fail @Network valuesAreSentAsJson() = Server.answering(catalogue) {
@@ -49,15 +60,24 @@ catalogue: List<Route> = [
 }
 
 @Test @Fail @Network whatIsntTheValueIsABadRequest() = Server.answering(catalogue) {
-  wrong = Client.post("http://shop.example/items", "{\"name\":\"desk\"}".encodeToBytes(), "application/json")
+  wrong = Client.post(
+    "http://shop.example/items",
+    "{\"name\":\"desk\"}".encodeToBytes(),
+    "application/json",
+  )
   assertEquals(badRequest, wrong.status)
   assertEquals("Item needs price, which isn't there", wrong.text)
-  assertEquals(badRequest, Client.post("http://shop.example/items", "not json".encodeToBytes(), "application/json").status)
+  assertEquals(
+    badRequest,
+    Client.post("http://shop.example/items", "not json".encodeToBytes(), "application/json").status,
+  )
 }
 
 @Test @Fail @Network aResponseThatIsntTheValueFails() = Server.answering([Route(Get, "/", call -> text(ok, "[]"))]) {
   assertEquals(
-    Error("the response from the server isn't what was asked for: expected Item, an object, not an array"),
+    Error(
+      "the response from the server isn't what was asked for: expected Item, an object, not an array",
+    ),
     Fail(fail = (reason, _) -> Error(reason)) { Ok(Client.get("http://shop.example/").json(ItemSerializer)) },
   )
 }

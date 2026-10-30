@@ -19,14 +19,24 @@ saying(what: String): (Call) -> Response = _ -> text(ok, what)
 }
 
 @Test @Fail aParameterIsTriedWhereAFixedSegmentLeadsNowhere() = {
-  routes = [Route(Get, "/items/new", saying("a form")), Route(Get, "/{owner}/{id}/visits", saying("visits"))]
+  routes = [
+    Route(Get, "/items/new", saying("a form")),
+    Route(Get, "/{owner}/{id}/visits", saying("visits")),
+  ]
   assertEquals("visits", answered(routes, Get, "/items/3/visits"))
   assertEquals("a form", answered(routes, Get, "/items/new"))
 }
 
 @Test @Fail routesThatClashAreRefused() = {
-  routes = [Route(Get, "/links/{slug}", saying("one")), Route(Post, "/links/{id}", saying("made")), Route(Get, "/links/{id}", saying("two"))]
-  assertEquals(Error("GET /links/{slug} and /links/{id} match the same requests"), Routers.of(routes).map { _ -> "served" })
+  routes = [
+    Route(Get, "/links/{slug}", saying("one")),
+    Route(Post, "/links/{id}", saying("made")),
+    Route(Get, "/links/{id}", saying("two")),
+  ]
+  assertEquals(
+    Error("GET /links/{slug} and /links/{id} match the same requests"),
+    Routers.of(routes).map { _ -> "served" },
+  )
 }
 
 @Test @Fail routesAreMounted() = {

@@ -34,10 +34,18 @@ module Sockets : Network {
     "(fun l -> let rec go () = match Unix.accept l with (s, _) -> Ok s | exception Unix.Unix_error (Unix.EINTR, _, _) -> go () | exception Unix.Unix_error (e, _, _) -> Error (Unix.error_message e) in go ()) listener"
   private external received(connection: Connection): Result<Bytes, String> = "(fun (_, _, receive, _, _) -> receive ()) connection"
   private external sent(connection: Connection, bytes: Bytes): Result<Unit, String> = "(fun (_, _, _, send, _) b -> send b) connection bytes"
-  private external closed(connection: Connection): Unit = "(fun (_, _, _, _, close) -> close ()) connection"
-  private external closeListener(listener: Listener): Unit = "(fun l -> try Unix.close l with Unix.Unix_error _ -> ()) listener"
+  private external closed(
+    connection: Connection,
+  ): Unit = "(fun (_, _, _, _, close) -> close ()) connection"
+  private external closeListener(
+    listener: Listener,
+  ): Unit = "(fun l -> try Unix.close l with Unix.Unix_error _ -> ()) listener"
 
-  internal external descriptorOf(connection: Connection): Descriptor = "(fun (s, _, _, _, _) -> s) connection"
-  internal external buffered(connection: Connection): Boolean = "(fun (_, b, _, _, _) -> b ()) connection"
+  internal external descriptorOf(
+    connection: Connection,
+  ): Descriptor = "(fun (s, _, _, _, _) -> s) connection"
+  internal external buffered(
+    connection: Connection,
+  ): Boolean = "(fun (_, b, _, _, _) -> b ()) connection"
   internal external listenerDescriptor(listener: Listener): Descriptor = "listener"
 }
