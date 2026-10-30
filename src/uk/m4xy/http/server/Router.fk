@@ -1,0 +1,3 @@
+// Routes in a tree of their paths' segments, which a request's path is found in a segment at a
+// time, rather than by trying every route: what Routers.of makes, and Server serves.
+type Router<@E>(root: RouteNode<@E>)

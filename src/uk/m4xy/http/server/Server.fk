@@ -18,12 +18,19 @@ module Server {
   // it receives and sends as PolledSockets does, so while one waits for a slow client the others
   // are answered; the routes take turns, as tasks do, so none sees another half way through. A
   // connection that receives or sends nothing for timeout is closed. The tasks are run as executor
-  // runs them.
-  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = Polls.running(executor) {
-    PolledSockets.running(timeout) {
-      when (listen(port)) {
-        Ok(listener) -> forever(listener, routes, timeout)
-        Error(reason) -> fail(reason)
+  // runs them. Routes that can't be served together, as two that match the same requests, fail
+  // before anything is served, saying why.
+  @Fail @Clock serve<@E>(port: Int, routes: List<Route<@E>>, timeout: Duration = Duration(30000), executor: Executor = InTurn): Nothing = {
+    router = when (Routers.of(routes)) {
+      Ok(r) -> r
+      Error(why) -> fail("can't serve the routes: $why")
+    }
+    Polls.running(executor) {
+      PolledSockets.running(timeout) {
+        when (listen(port)) {
+          Ok(listener) -> forever(listener, router, timeout)
+          Error(reason) -> fail(reason)
+        }
       }
     }
   }
@@ -31,13 +38,13 @@ module Server {
   // Accepts the next connection to listener, and answers it, waiting for it as Network does.
   @Network handleNext<@E>(listener: Listener, routes: List<Route<@E>>): Unit = when (accept(listener)) {
     Error(_) -> Unit
-    Ok(connection) -> answer(connection, routes)
+    Ok(connection) -> answer(connection, request -> Routes.respond(routes, request))
   }
 
   // Answers the connection's request, and closes it: a request that isn't HTTP is answered 400.
-  @Network private answer<@E>(connection: Connection, routes: List<Route<@E>>): Unit = {
+  @Network private answer<@E>(connection: Connection, respond: @E (Request) -> Response): Unit = {
     response = when (attempt { Connections.reading(connection) { Wire.readRequest() } }) {
-      Ok(Some(request)) -> Some(Routes.respond(routes, request))
+      Ok(Some(request)) -> Some(respond(request))
       Ok(None) -> None
       Error(reason) -> Some(Messages.text(badRequest, reason))
     }
@@ -49,18 +56,23 @@ module Server {
   // Runs body with the requests it sends answered by routes, as a server of them would, without
   // the network: to test a client and server together. It's @Network only as anything that does
   // @Http is.
-  @Network answering<@E, A>(routes: List<Route<@E>>, body: @Http () -> A): A =
-    Http(send = request -> Ok(Routes.respond(routes, request))) { body() }
+  @Network answering<@E, A>(routes: List<Route<@E>>, body: @Http () -> A): A = {
+    router = Routers.of(routes)
+    Http(send = request -> Ok(when (router) {
+      Ok(r) -> Routers.respond(r, request)
+      Error(why) -> Messages.text(internalServerError, "can't serve the routes: $why")
+    })) { body() }
+  }
 
   // Accepts connections for ever, each answered by a task of its own.
-  @Network @Concurrent<@Polling @Clock @E> @Polling private forever<@E>(listener: Listener, routes: List<Route<@E>>, timeout: Duration): Nothing = {
+  @Network @Concurrent<@Polling @Clock @E> @Polling private forever<@E>(listener: Listener, router: Router<@E>, timeout: Duration): Nothing = {
     when (accept(listener)) {
       Ok(connection) -> {
-        launch { PolledSockets.running(timeout) { answer(connection, routes) } }
+        launch { PolledSockets.running(timeout) { answer(connection, request -> Routers.respond(router, request)) } }
         Unit
       }
       Error(_) -> Unit
     }
-    forever(listener, routes, timeout)
+    forever(listener, router, timeout)
   }
 }

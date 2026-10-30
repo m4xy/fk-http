@@ -1,0 +1,44 @@
+import fckt.effects.Fail
+import uk.m4xy.fktests.api.Test
+import uk.m4xy.http.*
+import uk.m4xy.http.Messages.*
+import uk.m4xy.http.Statuses.*
+import uk.m4xy.http.server.*
+
+// Which route a request takes, whatever order the routes are in.
+
+@Fail answered(routes: List<Route>, method: Method, path: String): String = when (Routers.of(routes)) {
+  Ok(router) -> Routers.respond(router, Request(method, Url(Http, "shop.example", 80, path))).text
+  Error(why) -> fail(why)
+}
+
+saying(what: String): (Call) -> Response = _ -> text(ok, what)
+
+// A fixed segment comes before a parameter, though the parameter's route comes first.
+@Test @Fail aFixedSegmentComesFirst() = {
+  routes = [Route(Get, "/{slug}", saying("a link")), Route(Get, "/health", saying("up"))]
+  assertEquals("up", answered(routes, Get, "/health"))
+  assertEquals("a link", answered(routes, Get, "/docs"))
+}
+
+// Where a fixed segment's routes have nothing further on, a parameter's are tried.
+@Test @Fail aParameterIsTriedWhereAFixedSegmentLeadsNowhere() = {
+  routes = [Route(Get, "/items/new", saying("a form")), Route(Get, "/{owner}/{id}/visits", saying("visits"))]
+  assertEquals("visits", answered(routes, Get, "/items/3/visits"))
+  assertEquals("a form", answered(routes, Get, "/items/new"))
+}
+
+// Two routes for one method whose paths match the same requests can't be served together.
+@Test @Fail routesThatClashAreRefused() = {
+  routes = [Route(Get, "/links/{slug}", saying("one")), Route(Post, "/links/{id}", saying("made")), Route(Get, "/links/{id}", saying("two"))]
+  assertEquals(Error("GET /links/{slug} and /links/{id} match the same requests"), Routers.of(routes).map { _ -> "served" })
+}
+
+// Each part of a service says its own routes, and they're mounted together.
+@Test @Fail routesAreMounted() = {
+  items = [Route(Get, "/", saying("every item")), Route(Get, "/{id}", saying("an item"))]
+  routes = Routes.mounted("/items", items) + Routes.mounted("/api/users/", [Route(Get, "/{id}", saying("a user"))])
+  assertEquals(["/items", "/items/{id}", "/api/users/{id}"], routes.map { it.path })
+  assertEquals("every item", answered(routes, Get, "/items"))
+  assertEquals("a user", answered(routes, Get, "/api/users/7"))
+}

@@ -1,37 +1,18 @@
-import fckt.effects.Failure.attempt
-import fckt.collections.Maps.*
-import fckt.collections.Maps.Map
 import uk.m4xy.http.*
 import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
 
 // Answering requests with routes.
 module Routes {
-  // The response of the first of routes for request's method and path: 404 if none is for its
-  // path, 405 if none of those is for its method, and 500 if it fails.
-  respond<@E>(routes: List<Route<@E>>, request: Request): Response = {
-    onPath = routes.map { r -> (r, matched(r.path.split("/"), request.url.path.split("/"), emptyMap())) }.filter { _, params -> params != None }
-    when (onPath.find { r, _ -> r.method == request.method }) {
-      Some((route, Some(params))) -> {
-        respond = route.respond
-        when (attempt { respond(Call(request, params)) }) {
-          Ok(response) -> response
-          Error(reason) -> text(internalServerError, reason)
-        }
-      }
-      _ if onPath.isEmpty() -> text(notFound, "nothing is at ${request.url.path}")
-      _ -> {
-        allowed = onPath.map { r, _ -> MethodText.of(r.method) }.joinToString(", ")
-        text(methodNotAllowed, "${request.url.path} takes $allowed").copy(headers = [Header("Allow", allowed)])
-      }
-    }
+  // The response of the route for the request's method and path, as Routers.respond gives it; 500 if
+  // the routes can't be served together, saying why.
+  respond<@E>(routes: List<Route<@E>>, request: Request): Response = when (Routers.of(routes)) {
+    Ok(router) -> Routers.respond(router, request)
+    Error(why) -> text(internalServerError, why)
   }
 
-  // What the segments of path match those of pattern with, by name; None if they don't.
-  private matched(pattern: List<String>, path: List<String>, params: Map<String, String>): Option<Map<String, String>> = when (pattern, path) {
-    ([], []) -> Some(params)
-    ([p, *ps], [s, *ss]) if p.startsWith("{") && p.endsWith("}") && s.isNotEmpty() -> matched(ps, ss, params.put(p.drop(1).dropLast(1), s))
-    ([p, *ps], [s, *ss]) if p == s -> matched(ps, ss, params)
-    _ -> None
-  }
+  // The routes, each under prefix: /links/{slug} mounted at /api is /api/links/{slug}. Each part of
+  // a service can say its own routes, and the service mount them together.
+  mounted<@E>(prefix: String, routes: List<Route<@E>>): List<Route<@E>> =
+    routes.map { it.copy(path = prefix.removeSuffix("/") + (if (it.path == "/") "" else it.path)) }
 }
