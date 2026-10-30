@@ -1,3 +1,4 @@
+import fckt.effects.Fail
 import uk.m4xy.http.*
 import uk.m4xy.http.Messages.*
 import uk.m4xy.http.Statuses.*
@@ -15,4 +16,16 @@ module Routes {
   // a service can say its own routes, and the service mount them together.
   mounted<@E>(prefix: String, routes: List<Route<@E>>): List<Route<@E>> =
     routes.map { it.copy(path = prefix.removeSuffix("/") + (if (it.path == "/") "" else it.path)) }
+
+  // The routes, each answering inside around: what they do that around handles, they're answered
+  // with. A handler's operations are answered where the handler is, so what's to be handled for
+  // each request, as a database's links, is handled around it, inside the route, so that if it
+  // fails, that request is answered 500, not every one after it:
+  //
+  //   Routes.around(routes) { respond -> SqliteLinks.keeping { respond() } }
+  around<@E, @F>(routes: List<Route<@E>>, around: @Fail @F (@Fail @E () -> Response) -> Response): List<Route<@F>> =
+    routes.map { route ->
+      respond = route.respond
+      Route(route.method, route.path, call -> around { respond(call) })
+    }
 }

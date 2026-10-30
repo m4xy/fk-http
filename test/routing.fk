@@ -42,3 +42,21 @@ saying(what: String): (Call) -> Response = _ -> text(ok, what)
   assertEquals("every item", answered(routes, Get, "/items"))
   assertEquals("a user", answered(routes, Get, "/api/users/7"))
 }
+
+effect Shelf {
+  count(): Int
+}
+
+// What's handled around each route is handled for each request, inside it: a handler that fails
+// fails that request, 500, and the next is answered.
+@Test @Fail routesAreAnsweredAroundAHandler() = {
+  shelf: List<Route<@Shelf>> = [Route(Get, "/count", _ -> text(ok, "${count()}"))]
+  var asked = 0
+  handled = Routes.around(shelf) { respond ->
+    asked = asked + 1
+    Shelf(count = () -> if (asked == 2) fail("the shelf fell") else asked) { respond() }
+  }
+  assertEquals("1", answered(handled, Get, "/count"))
+  assertEquals("the shelf fell", answered(handled, Get, "/count"))
+  assertEquals("3", answered(handled, Get, "/count"))
+}
