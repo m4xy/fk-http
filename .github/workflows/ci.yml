@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  # Nightly, so a change to fckt, kiln or a library it uses is tested here without a push here.
+  schedule:
+    - cron: "17 4 * * *"
 
 # Built with fckt and kiln as they are on main, checked out beside it, as bootstrap.sh expects.
 jobs:
