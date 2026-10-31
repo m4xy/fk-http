@@ -39,6 +39,11 @@ jobs:
       - name: Bootstrap kiln
         working-directory: kiln
         run: opam exec -- ./bootstrap.sh && echo "$HOME/.kiln/bin" >> "$GITHUB_PATH"
+      # Nightly, with the newest of what it fetches from git rather than what kiln.lock says.
+      - name: Update what's fetched from git
+        if: github.event_name == 'schedule'
+        working-directory: fk-http
+        run: opam exec -- kiln update
       - name: Build and test
         working-directory: fk-http
         run: opam exec -- kiln build
