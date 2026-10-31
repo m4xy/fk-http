@@ -69,3 +69,19 @@ effect Shelf {
   assertEquals("the shelf fell", answered(handled, Get, "/count"))
   assertEquals("3", answered(handled, Get, "/count"))
 }
+
+// A handler around routes can be given each call, as what logs requests is; the routes keep what
+// they say they answer.
+@Test @Fail routesAreAnsweredAroundWhatTheyreAsked() = {
+  var seen: List<String> = []
+  routes = Routes.aroundCalls(
+    [Route(Get, "/items/{id}", call -> text(ok, "item"), answers = [RouteAnswer(ok, None)])],
+  ) { call, respond ->
+    response = respond()
+    seen = seen + ["${call.request.url.path} ${response.status.code}"]
+    response
+  }
+  assertEquals("item", answered(routes, Get, "/items/7"))
+  assertEquals(["/items/7 200"], seen)
+  assertEquals([RouteAnswer(ok, None)], routes.flatMap { it.answers })
+}

@@ -12,13 +12,29 @@ module Routes {
   mounted<@E>(prefix: String, routes: List<Route<@E>>): List<Route<@E>> =
     routes.map { it.copy(path = prefix.removeSuffix("/") + (if (it.path == "/") "" else it.path)) }
 
+  // The routes, each answering inside around, as each request's database transaction is: what
+  // they read and answer, and their summaries, as they were.
   around<@E, @F>(
     routes: List<Route<@E>>,
     around: @Fail @F (@Fail @E () -> Response) -> Response,
+  ): List<Route<@F>> = aroundCalls(routes) { _, respond -> around(respond) }
+
+  // The routes, each answering inside around, which is given the call it answers, as what logs
+  // each request does.
+  aroundCalls<@E, @F>(
+    routes: List<Route<@E>>,
+    around: @Fail @F (Call, @Fail @E () -> Response) -> Response,
   ): List<Route<@F>> =
     routes.map { route ->
       respond = route.respond
-      Route(route.method, route.path, call -> around { respond(call) })
+      Route(
+        route.method,
+        route.path,
+        call -> around(call) { respond(call) },
+        route.reads,
+        route.answers,
+        route.summary,
+      )
     }
 
   Route<@E>.answering<@E>(
