@@ -5,7 +5,11 @@ project = Project(
   name = "fk-http",
   group = "uk.m4xy",
   version = "0.1.0",
-  dependencies = [library("uk.m4xy:fk-serialization:0.1.0")],
+  dependencies = [library(
+    "uk.m4xy:fk-serialization:0.1.0",
+    git = "https://github.com/m4xy/fk-serialization",
+    ref = "main",
+  )],
 )
 
 module WithSsl : FcktConfiguration {

@@ -29,14 +29,9 @@ jobs:
         with:
           repository: m4xy/fk-tests
           path: fk-tests
-      - uses: actions/checkout@v5
-        with:
-          repository: m4xy/fk-serialization
-          path: fk-serialization
       - uses: ocaml/setup-ocaml@v3
         with:
           ocaml-compiler: 5
-      # TLS is OpenSSL's, through the OCaml package ssl.
       - run: opam install -y ssl ocamlfind
       - name: Build fckt
         working-directory: fckt
@@ -44,13 +39,6 @@ jobs:
       - name: Bootstrap kiln
         working-directory: kiln
         run: opam exec -- ./bootstrap.sh && echo "$HOME/.kiln/bin" >> "$GITHUB_PATH"
-      # fk-serialization's processor reads symbols with fckt.symbols, from fckt.
-      - name: Publish fckt.symbols
-        working-directory: fckt/symbols
-        run: opam exec -- kiln publishLocal
-      - name: Publish fk-serialization
-        working-directory: fk-serialization
-        run: opam exec -- kiln publishLocal
       - name: Build and test
         working-directory: fk-http
         run: opam exec -- kiln build
