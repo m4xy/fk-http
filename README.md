@@ -81,6 +81,9 @@ matches, `Routes.respond` gives:
 A route can do any effect: a `List<Route<@Db>>` serves routes that use `@Db`.
 `Routes.mounted("/api/users", routes)` puts routes under a prefix, so each part of a service can
 say its own and the service mount them together.
+`Routes.around(routes) { respond -> ... }` answers each route inside a handler, as a database
+transaction for each request; `Routes.aroundCalls(routes) { call, respond -> ... }` is given the
+call too, as what logs each request's path and how it was answered is.
 
 ### Endpoints
 
